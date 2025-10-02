@@ -8,10 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
-        .loader {
+        .loader, .initial-loader-spinner {
             border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3b82f6;
             width: 30px; height: 30px; animation: spin 1s linear infinite;
         }
+        .initial-loader-spinner { width: 50px; height: 50px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .pac-container { z-index: 1050 !important; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .sidebar-link { transition: all 0.2s ease-in-out; }
@@ -22,6 +23,12 @@
     </style>
 </head>
 <body class="text-gray-800">
+
+    <!-- Initial Loading Screen -->
+    <div id="initial-loader" class="fixed inset-0 bg-gray-100 flex flex-col items-center justify-center z-[100]">
+        <div class="initial-loader-spinner mb-4"></div>
+        <p class="text-gray-600 font-semibold text-lg">Caricamento dati in corso...</p>
+    </div>
 
     <div class="relative min-h-screen md:flex">
         
@@ -66,6 +73,7 @@
 
             <main class="flex-1 p-4 md:p-8">
                 <div id="api-key-alert"></div>
+                <div id="firebase-alert"></div>
                 
                 <!-- Dashboard Content -->
                 <div id="content-dashboard">
@@ -259,10 +267,17 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    <script>
+        // --- GLOBAL VARIABLES & CONFIG ---
+        window.db = null;
+        let appointmentsCollectionPath = '';
+        
         // --- CONFIGURAZIONE ---
-        const API_KEY = "AIzaSyAwdbFG2Fh4d69MgNXa375YA9JCD-NKXPo";
+        const API_KEY = "AIzaSyAwdbFG2Fh4d69MgNXa375YA9JCD-NKXPo"; // Replace with your Google Maps API Key
         const PROXIMITY_RADIUS_KM_DEFAULT = 50;
         const HIGH_DENSITY_PROVINCES = { "Napoli": 15, "Salerno": 15, "Caserta": 20 };
         const technicians = [ { id: 1, name: "DANIELE", color: "red" }, { id: 2, name: "ERNESTO", color: "green" }, { id: 3, name: "CARMINE", color: "purple" } ];
@@ -275,40 +290,113 @@
         const LATEST_APPOINTMENT_START_MINUTES = 15 * 60 + 30; // 15:30
         const TRAVEL_TIME_MINUTES = 30; // 30 min di spostamento
         
+        // Data will be loaded from Firebase
         let allAppointments = [];
         let existingAppointments = [];
         let archivedAppointments = [];
 
         let map, geocoder, newCustomerLocation, distanceService;
         let autocomplete;
-        let nextAppointmentId = 102; // Start from a higher number to avoid collision with initial data
 
-        // --- FUNZIONI DI UTILITA' ---
+        // --- UTILITY FUNCTIONS ---
         const timeToMinutes = (timeStr) => { const [h, m] = timeStr.split(':').map(Number); return h * 60 + m; };
         const minutesToTime = (minutes) => { const h = Math.floor(minutes / 60).toString().padStart(2, '0'); const m = (minutes % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
         const formatDuration = (minutes) => { if (minutes >= 60) { const hours = minutes / 60; const plural = hours > 1 ? 'e' : 'a'; return `${hours} or${plural}`; } return `${minutes} minuti`; };
         
+        // --- FIREBASE INITIALIZATION ---
+        function initFirebase() {
+            try {
+                if (typeof __firebase_config === 'undefined' || typeof __app_id === 'undefined') {
+                    throw new Error("Configurazione Firebase non trovata.");
+                }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const appId = __app_id;
 
-        // --- FUNZIONI PRINCIPALI ---
+                const app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                setLogLevel('debug'); // For development
+                
+                appointmentsCollectionPath = `/artifacts/${appId}/public/data/appointments`;
+                listenToAppointments();
+
+            } catch (error) {
+                console.error("Errore Inizializzazione Firebase:", error);
+                document.getElementById('firebase-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Errore di Configurazione Firebase</p><p>Assicurati che le variabili d'ambiente __firebase_config e __app_id siano impostate correttamente in Railway.</p></div>`;
+                document.getElementById('initial-loader').classList.add('hidden'); // Hide loader on error
+            }
+        }
+
+        // --- FIREBASE DATA HANDLING ---
+        function listenToAppointments() {
+            const appointmentsCollection = collection(window.db, appointmentsCollectionPath);
+            
+            onSnapshot(appointmentsCollection, (snapshot) => {
+                console.log("Dati ricevuti da Firebase:", snapshot.docs.length, "documenti.");
+                allAppointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Separate appointments into current/future and archived
+                const todayForFilter = new Date().toISOString().split('T')[0];
+                existingAppointments = allAppointments.filter(app => app.date >= todayForFilter);
+                archivedAppointments = allAppointments.filter(app => app.date < todayForFilter);
+                
+                // Once data is loaded for the first time, hide the main loader
+                document.getElementById('initial-loader').classList.add('hidden');
+                
+                updateAll(); // Refresh all UI components with new data
+            }, (error) => {
+                console.error("Errore durante l'ascolto degli appuntamenti:", error);
+                document.getElementById('firebase-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Errore di Connessione al Database</p><p>Controlla le regole di sicurezza di Firestore e la tua connessione internet.</p></div>`;
+                document.getElementById('initial-loader').classList.add('hidden');
+            });
+        }
+
+        async function addAppointmentToDb(appointmentData) {
+            try {
+                const appointmentsCollection = collection(window.db, appointmentsCollectionPath);
+                await addDoc(appointmentsCollection, appointmentData);
+                console.log("Appuntamento aggiunto al DB.");
+            } catch (error) {
+                console.error("Errore nell'aggiungere l'appuntamento: ", error);
+            }
+        }
+
+        async function updateAppointmentInDb(appointmentId, updatedData) {
+            try {
+                const appointmentDoc = doc(window.db, appointmentsCollectionPath, appointmentId);
+                await updateDoc(appointmentDoc, updatedData);
+                console.log("Appuntamento aggiornato nel DB.");
+            } catch (error) {
+                console.error("Errore nell'aggiornare l'appuntamento: ", error);
+            }
+        }
+        
+        async function deleteAppointmentFromDb(appointmentId) {
+             try {
+                const appointmentDoc = doc(window.db, appointmentsCollectionPath, appointmentId);
+                await deleteDoc(appointmentDoc);
+                console.log("Appuntamento eliminato dal DB.");
+            } catch (error) {
+                console.error("Errore nell'eliminare l'appuntamento: ", error);
+            }
+        }
+
+        // --- MAIN APP LOGIC ---
         function gm_authFailure() { console.error("Google Maps Authentication Failure."); document.getElementById('map').innerHTML = `<div class="p-4 bg-red-100 text-red-800 rounded-lg text-left"><p class="font-bold">Errore di Autenticazione Google Maps</p><p>Controlla che la chiave API sia corretta, che la fatturazione sia attiva e che le API necessarie (Maps, Geocoding, Places, Distance Matrix) siano abilitate.</p></div>`; }
 
         document.addEventListener('DOMContentLoaded', () => {
-             // Mobile navigation
+            initFirebase();
+            
+            // --- Mobile navigation setup ---
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
             const mobileMenuButton = document.getElementById('mobile-menu-button');
-
-            const toggleSidebar = () => {
-                sidebar.classList.toggle('-translate-x-full');
-                overlay.classList.toggle('hidden');
-            };
-
+            const toggleSidebar = () => { sidebar.classList.toggle('-translate-x-full'); overlay.classList.toggle('hidden'); };
             mobileMenuButton.addEventListener('click', toggleSidebar);
             overlay.addEventListener('click', toggleSidebar);
 
-
+            // --- Google Maps setup ---
             if (!API_KEY) {
-                document.getElementById('api-key-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Manca la Chiave API</p><p>Inserisci la chiave API di Google Maps.</p></div>`;
+                document.getElementById('api-key-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Manca la Chiave API Google Maps</p><p>Inserisci la chiave API di Google Maps nella variabile API_KEY.</p></div>`;
                 document.getElementById('search-button').disabled = true;
                 document.getElementById('search-button').classList.add('opacity-50', 'cursor-not-allowed');
                 document.getElementById('address').disabled = true;
@@ -318,41 +406,37 @@
                 script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap&libraries=geometry,places`;
                 script.async = true;
                 script.defer = true;
+                window.initMap = initMap; // Make it globally accessible
                 document.head.appendChild(script);
             }
+            
+            // --- Date input setup ---
             const today = new Date();
             const todayString = today.toISOString().split('T')[0];
             document.getElementById('summary-date').value = todayString;
             document.getElementById('manual-date').min = todayString;
             document.getElementById('map-date-filter').min = todayString;
-            
-            // --- DATI DI ESEMPIO ---
-            const dayAfterTomorrow = new Date();
-            dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-            const dayAfterTomorrowString = dayAfterTomorrow.toISOString().split('T')[0];
-            
-            const threeDaysLater = new Date();
-            threeDaysLater.setDate(threeDaysLater.getDate() + 3);
-            const threeDaysLaterString = threeDaysLater.toISOString().split('T')[0];
-            
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayString = yesterday.toISOString().split('T')[0];
-
-            allAppointments = [ 
-                { id: 101, date: yesterdayString, client: "Cliente Archiviato", address: "Via del Passato 1, Roma, RM", lat: 41.9028, lng: 12.4964, startTime: "10:00", duration: 120, description: "Controllo annuale", technicianId: 1 },
-                { id: 1, date: dayAfterTomorrowString, client: "Cliente Napoli", address: "Corso Umberto I, Napoli", lat: 40.8488, lng: 14.2592, startTime: "10:00", duration: 120, description: "Installazione", technicianId: 1 },
-                { id: 2, date: dayAfterTomorrowString, client: "Cliente Nocera", address: "Via Roma, Nocera Inferiore, SA", lat: 40.745, lng: 14.640, startTime: "09:00", duration: 60, description: "", technicianId: 3 },
-                { id: 3, date: threeDaysLaterString, client: "Cliente Caserta", address: "Viale Vittorio Veneto, Caserta, CE", lat: 41.07, lng: 14.33, startTime: "09:00", duration: 60, description: "Manutenzione", technicianId: 1 },
-            ];
-
-            // --- SEPARAZIONE ARCHIVIATI / ESISTENTI ---
-            const todayForFilter = new Date().toISOString().split('T')[0];
-            existingAppointments = allAppointments.filter(app => app.date >= todayForFilter);
-            archivedAppointments = allAppointments.filter(app => app.date < todayForFilter);
-            
-            updateAll();
         });
+        
+        // Expose functions to global scope to be accessible from inline HTML onclick attributes
+        window.switchTab = switchTab;
+        window.viewToday = viewToday;
+        window.viewTomorrow = viewTomorrow;
+        window.viewTotal = viewTotal;
+        window.handleAddressCheck = handleAddressCheck;
+        window.updateMap = updateMap;
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.openEditModal = openEditModal;
+        window.closeEditModal = closeEditModal;
+        window.saveAppointmentChanges = saveAppointmentChanges;
+        window.openDeleteModal = openDeleteModal;
+        window.closeDeleteModal = closeDeleteModal;
+        window.openReassignModal = openReassignModal;
+        window.closeReassignModal = closeReassignModal;
+        window.displayDailySummary = displayDailySummary;
+        window.displayArchive = displayArchive;
+        window.updateAvailableTimesInModal = updateAvailableTimesInModal;
         
         function initMap() { 
             console.log("Google Maps API caricata."); 
@@ -414,71 +498,43 @@
         
         function canScheduleLunch(workSchedule) {
             const lunchSearchEnd = LUNCH_WINDOW_END_MINUTES - LUNCH_BREAK_DURATION;
-
-            // Tentiamo di posizionare un blocco per il pranzo
             for (let lunchStart = LUNCH_WINDOW_START_MINUTES; lunchStart <= lunchSearchEnd; lunchStart += SLOT_INCREMENT_MINUTES) {
                 const lunchBlock = { start: lunchStart, end: lunchStart + LUNCH_BREAK_DURATION, type: 'lunch' };
-
-                // 1. Controlla se il pranzo si sovrappone direttamente a un lavoro. Se sì, questo slot è impossibile.
-                const lunchOverlapsWork = workSchedule.some(work =>
-                    lunchBlock.start < work.end && lunchBlock.end > work.start
-                );
-                if (lunchOverlapsWork) {
-                    continue; // Prova il prossimo orario di inizio per il pranzo
-                }
-
-                // 2. Crea un'agenda completa (lavori + questo tentativo di pranzo)
+                const lunchOverlapsWork = workSchedule.some(work => lunchBlock.start < work.end && lunchBlock.end > work.start);
+                if (lunchOverlapsWork) continue;
                 const fullSchedule = [...workSchedule.map(w => ({...w, type: 'work'})), lunchBlock];
                 fullSchedule.sort((a, b) => a.start - b.start);
-
-                // 3. Controlla se l'agenda completa è valida, considerando i tempi di spostamento
                 let isThisPlacementValid = true;
                 for (let i = 0; i < fullSchedule.length - 1; i++) {
                     const currentEvent = fullSchedule[i];
                     const nextEvent = fullSchedule[i+1];
-
                     let requiredGap = TRAVEL_TIME_MINUTES;
-
-                    // CASO SPECIALE: Se un lavoro è seguito immediatamente dal pranzo, non c'è tempo di spostamento in mezzo.
                     if (currentEvent.type === 'work' && nextEvent.type === 'lunch' && currentEvent.end === nextEvent.start) {
                         requiredGap = 0;
                     }
-
-                    // Se la fine dell'evento corrente + il tempo di spostamento necessario si sovrappone all'inizio del prossimo, è un conflitto.
                     if (currentEvent.end + requiredGap > nextEvent.start) {
                         isThisPlacementValid = false;
-                        break; // Conflitto rilevato, questo posizionamento del pranzo non è valido
+                        break;
                     }
                 }
-
-                if (isThisPlacementValid) {
-                    return true; // Trovato un posizionamento valido per la pausa pranzo
-                }
+                if (isThisPlacementValid) return true;
             }
-
-            return false; // Provati tutti gli orari possibili per il pranzo, nessuno ha funzionato
+            return false;
         }
 
         function calculateAvailableSlots(techAppointments, requiredDuration) {
             const availableSlots = [];
-
-            // Itera su tutti i possibili orari di inizio per il NUOVO appuntamento
             for (let t = WORK_DAY_START_MINUTES; t <= LATEST_APPOINTMENT_START_MINUTES; t += SLOT_INCREMENT_MINUTES) {
                 const newAppWorkBlock = { start: t, end: t + requiredDuration };
-
                 const hypotheticalWorkSchedule = techAppointments.map(app => ({
                     start: timeToMinutes(app.startTime),
                     end: timeToMinutes(app.startTime) + app.duration
                 }));
                 hypotheticalWorkSchedule.push(newAppWorkBlock);
-                
-                // Controlla se questa nuova agenda ipotetica permette di inserire una pausa pranzo valida,
-                // tenendo conto di tutte le regole sugli spostamenti.
                 if (canScheduleLunch(hypotheticalWorkSchedule)) {
                     availableSlots.push(minutesToTime(t));
                 }
             }
-
             return availableSlots;
         }
 
@@ -491,8 +547,6 @@
             const searchLogic = async (searchDate) => {
                 const dateString = searchDate.toISOString().split('T')[0];
                 const appointmentsOnDate = existingAppointments.filter(app => app.date === dateString);
-
-                // Priorità 1: Prossimità
                 if (appointmentsOnDate.length > 0) {
                     let proximityOptions = [];
                     for (const app of appointmentsOnDate) {
@@ -512,11 +566,8 @@
                         }
                     }
                 }
-                
-                // Priorità 2: Tecnico Libero o meno occupato
                 const techLoad = technicians.map(tech => ({ tech, appointments: appointmentsOnDate.filter(a => a.technicianId === tech.id) }));
                 techLoad.sort((a,b) => a.appointments.length - b.appointments.length);
-                
                 for(const item of techLoad){
                     const availableSlots = calculateAvailableSlots(item.appointments, duration);
                     if (availableSlots.length > 0) {
@@ -524,7 +575,6 @@
                         return { isOptimal: false, date: dateString, tech: item.tech, availableSlots, reason: reason, priority: 2, dateObj: searchDate };
                     }
                 }
-                
                 return null;
             };
 
@@ -551,7 +601,6 @@
                     if (a.priority !== b.priority) return a.priority - b.priority;
                     return a.dateObj - b.dateObj;
                 });
-                
                 bestOptions = allPossibleOptions.slice(0, 3);
             }
             
@@ -569,32 +618,22 @@
             }
         }
         
-        function openModal(date, startTime, technicianId) { const modal = document.getElementById('client-modal'); const modalDetails = document.getElementById('modal-details'); const confirmButton = document.getElementById('modal-confirm-button'); const clientNameInput = document.getElementById('client-name'); const errorP = document.getElementById('modal-error'); const descInput = document.getElementById('client-description'); clientNameInput.value = ''; descInput.value = ''; errorP.classList.add('hidden'); const formattedDate = new Date(date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }); const duration = document.getElementById('duration').value; modalDetails.innerHTML = `Stai prenotando per <strong>${formattedDate}</strong> alle ore <strong>${startTime}</strong>.`; confirmButton.onclick = () => { const clientName = clientNameInput.value.trim(); if (clientName) { assignAppointment(date, startTime, technicianId, clientName); closeModal(); } else { errorP.classList.remove('hidden'); } }; modal.classList.remove('hidden'); clientNameInput.focus(); }
+        function openModal(date, startTime, technicianId) { const modal = document.getElementById('client-modal'); const modalDetails = document.getElementById('modal-details'); const confirmButton = document.getElementById('modal-confirm-button'); const clientNameInput = document.getElementById('client-name'); const errorP = document.getElementById('modal-error'); const descInput = document.getElementById('client-description'); clientNameInput.value = ''; descInput.value = ''; errorP.classList.add('hidden'); const formattedDate = new Date(date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }); modalDetails.innerHTML = `Stai prenotando per <strong>${formattedDate}</strong> alle ore <strong>${startTime}</strong>.`; confirmButton.onclick = () => { const clientName = clientNameInput.value.trim(); if (clientName) { assignAppointment(date, startTime, technicianId, clientName); closeModal(); } else { errorP.classList.remove('hidden'); } }; modal.classList.remove('hidden'); clientNameInput.focus(); }
         function closeModal() { document.getElementById('client-modal').classList.add('hidden'); }
         
         function assignAppointment(date, startTime, technicianId, clientName) { 
             const address = document.getElementById('address').value; 
             const duration = parseInt(document.getElementById('duration').value);
             const description = document.getElementById('client-description').value;
-            const newAppointment = { id: nextAppointmentId++, date: date, client: clientName, address: address, lat: newCustomerLocation.lat(), lng: newCustomerLocation.lng(), startTime: startTime, duration: duration, description: description, technicianId: technicianId }; 
-            existingAppointments.push(newAppointment); 
-            document.getElementById('info-message').innerHTML = `<p class="text-green-700 font-bold">✅ Appuntamento fissato per ${clientName}!</p>`; 
+            const newAppointment = { date: date, client: clientName, address: address, lat: newCustomerLocation.lat(), lng: newCustomerLocation.lng(), startTime: startTime, duration: duration, description: description, technicianId: technicianId }; 
+            addAppointmentToDb(newAppointment);
+            document.getElementById('info-message').innerHTML = `<p class="text-green-700 font-bold">✅ Appuntamento fissato per ${clientName}! I dati verranno aggiornati a breve.</p>`; 
             document.getElementById('results').innerHTML = '<p class="text-gray-500">Appuntamento confermato.</p>'; 
-            updateAll();
         }
         
-        // --- FUNZIONALITA' EDIT ---
         function isScheduleConflict(appointmentToEdit, newStartTimeStr, newDuration) {
-            const { technicianId, date } = appointmentToEdit;
-
-            // Prendi tutti gli ALTRI appuntamenti per questo tecnico in questo giorno
-            const otherAppointments = existingAppointments.filter(app =>
-                app.id !== appointmentToEdit.id &&
-                app.technicianId === technicianId &&
-                app.date === date
-            );
-
-            // Crea un'agenda di lavoro ipotetica con l'appuntamento modificato
+            const { technicianId, date, id } = appointmentToEdit;
+            const otherAppointments = existingAppointments.filter(app => app.id !== id && app.technicianId === technicianId && app.date === date);
             const hypotheticalWorkSchedule = otherAppointments.map(app => ({
                 start: timeToMinutes(app.startTime),
                 end: timeToMinutes(app.startTime) + app.duration
@@ -603,44 +642,30 @@
                 start: timeToMinutes(newStartTimeStr), 
                 end: timeToMinutes(newStartTimeStr) + newDuration 
             });
-
-            // C'è un conflitto se NON è possibile schedulare una pausa pranzo valida con questa nuova configurazione.
             return !canScheduleLunch(hypotheticalWorkSchedule);
         }
         
         function updateAvailableTimesInModal() {
-            const appointmentId = parseInt(document.getElementById('edit-appointment-id').value);
+            const appointmentId = document.getElementById('edit-appointment-id').value;
             const app = existingAppointments.find(a => a.id === appointmentId);
             if (!app) return;
-
             const newDuration = parseInt(document.getElementById('edit-duration').value);
             const timeSelect = document.getElementById('edit-start-time');
-            
             const otherAppointments = existingAppointments.filter(a => a.id !== app.id && a.technicianId === app.technicianId && a.date === app.date);
-            
             const availableSlots = calculateAvailableSlots(otherAppointments, newDuration);
-            
-            // Add the original slot to the list if it's not already there, to ensure it's always an option if no other changes are made.
             if (!availableSlots.includes(app.startTime)) {
                 availableSlots.push(app.startTime);
                 availableSlots.sort();
             }
-
             timeSelect.innerHTML = '';
             if (availableSlots.length > 0) {
                 availableSlots.forEach(slot => {
-                    const option = document.createElement('option');
-                    option.value = slot;
-                    option.textContent = slot;
-                    timeSelect.appendChild(option);
+                    const option = document.createElement('option'); option.value = slot; option.textContent = slot; timeSelect.appendChild(option);
                 });
             } else {
-                 const option = document.createElement('option');
-                 option.textContent = "Nessun orario";
-                 timeSelect.appendChild(option);
+                 const option = document.createElement('option'); option.textContent = "Nessun orario"; timeSelect.appendChild(option);
             }
         }
-
 
         function openEditModal(appointmentId) {
             const app = existingAppointments.find(a => a.id === appointmentId);
@@ -649,10 +674,8 @@
             document.getElementById('edit-client-name').value = app.client;
             document.getElementById('edit-client-description').value = app.description || '';
             document.getElementById('edit-duration').value = app.duration;
-            
-            updateAvailableTimesInModal(); // Populate time slots based on original duration
+            updateAvailableTimesInModal();
             document.getElementById('edit-start-time').value = app.startTime;
-
             document.getElementById('edit-modal-details').textContent = `Data: ${new Date(app.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}`;
             document.getElementById('edit-modal-error').classList.add('hidden');
             document.getElementById('edit-modal').classList.remove('hidden');
@@ -661,41 +684,29 @@
         function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
 
         function saveAppointmentChanges() {
-            const appointmentId = parseInt(document.getElementById('edit-appointment-id').value);
+            const appointmentId = document.getElementById('edit-appointment-id').value;
             const errorP = document.getElementById('edit-modal-error');
-            const appIndex = existingAppointments.findIndex(a => a.id === appointmentId);
-            
-            if (appIndex === -1) return;
-
-            const app = existingAppointments[appIndex];
+            const app = existingAppointments.find(a => a.id === appointmentId);
+            if (!app) return;
             const newClientName = document.getElementById('edit-client-name').value;
             const newDescription = document.getElementById('edit-client-description').value;
             const newDuration = parseInt(document.getElementById('edit-duration').value);
             const newStartTime = document.getElementById('edit-start-time').value;
-
             errorP.classList.add('hidden');
-            
             if (!newStartTime) {
                 errorP.textContent = "Nessun orario valido disponibile per la durata selezionata.";
                 errorP.classList.remove('hidden');
                 return;
             }
-
             if (isScheduleConflict(app, newStartTime, newDuration)) {
                 errorP.textContent = "Errore: Il nuovo orario o durata crea un conflitto con un altro appuntamento o con la pausa pranzo.";
                 errorP.classList.remove('hidden');
                 return;
             }
-            
-            existingAppointments[appIndex].client = newClientName;
-            existingAppointments[appIndex].description = newDescription;
-            existingAppointments[appIndex].duration = newDuration;
-            existingAppointments[appIndex].startTime = newStartTime;
-            
-            updateAll();
+            const updatedData = { client: newClientName, description: newDescription, duration: newDuration, startTime: newStartTime };
+            updateAppointmentInDb(appointmentId, updatedData);
             closeEditModal();
         }
-
 
         function openDeleteModal(appointmentId) {
             const modal = document.getElementById('delete-modal');
@@ -704,16 +715,11 @@
             const appToDelete = existingAppointments.find(app => app.id === appointmentId);
             if (!appToDelete) return;
             modalDetails.innerHTML = `Sei sicuro di voler cancellare l'appuntamento di <strong>${appToDelete.client}</strong> delle ore <strong>${appToDelete.startTime}</strong>?`;
-            confirmButton.onclick = () => { deleteAppointment(appointmentId); closeDeleteModal(); };
+            confirmButton.onclick = () => { deleteAppointmentFromDb(appointmentId); closeDeleteModal(); };
             modal.classList.remove('hidden');
         }
 
         function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); }
-
-        function deleteAppointment(appointmentId) {
-            existingAppointments = existingAppointments.filter(app => app.id !== appointmentId);
-            updateAll();
-        }
 
         function openReassignModal(appointmentId) {
             const modal = document.getElementById('reassign-modal');
@@ -732,35 +738,29 @@
         function closeReassignModal() { document.getElementById('reassign-modal').classList.add('hidden'); }
 
         function reassignAppointment(appointmentId, newTechId) {
-            const appIndex = existingAppointments.findIndex(a => a.id === appointmentId);
-            if (appIndex > -1) { existingAppointments[appIndex].technicianId = newTechId; updateAll(); }
+            updateAppointmentInDb(appointmentId, { technicianId: newTechId });
         }
 
         function displayDailySummary() { 
             const container = document.getElementById('summary-container');
             const selectedDate = document.getElementById('summary-date').value;
             const searchTerm = document.getElementById('client-search').value.toLowerCase();
-            
             let appointmentsToShow = existingAppointments;
-            
             if (searchTerm) {
                  appointmentsToShow = appointmentsToShow.filter(app => app.client.toLowerCase().includes(searchTerm));
             } else if (selectedDate) {
                  appointmentsToShow = appointmentsToShow.filter(app => app.date === selectedDate);
             }
-
             if (appointmentsToShow.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500 py-8 bg-white rounded-xl shadow-md">Nessun appuntamento trovato per i criteri selezionati.</p>';
                 return;
             }
-
             const groupedByTechnician = technicians.map(tech => ({
                 ...tech,
                 appointments: appointmentsToShow
                     .filter(app => app.technicianId === tech.id)
                     .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
             })).filter(techGroup => techGroup.appointments.length > 0);
-
             let html = '';
             if (searchTerm) {
                 html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Risultati ricerca per "${searchTerm}"</h2>`;
@@ -770,40 +770,12 @@
             } else {
                 html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Tutti gli Interventi Futuri</h2>`;
             }
-
             html += '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">';
-
             groupedByTechnician.forEach(techGroup => {
-                html += `
-                    <div class="bg-white rounded-xl shadow-md">
-                        <div class="flex items-center p-4 border-b">
-                            <span class="h-4 w-4 rounded-full mr-3" style="background-color: ${techGroup.color};"></span>
-                            <h3 class="text-xl font-bold text-gray-700">${techGroup.name}</h3>
-                        </div>
-                        <div class="space-y-3 p-4">`;
-                
+                html += `<div class="bg-white rounded-xl shadow-md"><div class="flex items-center p-4 border-b"><span class="h-4 w-4 rounded-full mr-3" style="background-color: ${techGroup.color};"></span><h3 class="text-xl font-bold text-gray-700">${techGroup.name}</h3></div><div class="space-y-3 p-4">`;
                 techGroup.appointments.forEach(app => {
                     const formattedDate = new Date(app.date + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-                    html += `
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <p class="font-bold text-md text-blue-800">${app.client}</p>
-                                    <p class="text-xs text-gray-500">${app.address}</p>
-                                     ${app.description ? `<p class="text-xs text-gray-800 mt-1 italic">"${app.description}"</p>` : ''}
-                                </div>
-                                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap">${app.startTime} (${formatDuration(app.duration)})</span>
-                            </div>
-                            <div class="mt-3 flex items-center justify-between">
-                                 <span class="text-sm font-medium text-gray-600">${formattedDate}</span>
-                                 <div class="flex items-center gap-2">
-                                     <button onclick="openEditModal(${app.id})" class="text-xs bg-gray-500 hover:bg-gray-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Modifica</button>
-                                     <button onclick="openReassignModal(${app.id})" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Riassegna</button>
-                                     <button onclick="openDeleteModal(${app.id})" class="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md transition-colors">Cancella</button>
-                                 </div>
-                            </div>
-                        </div>
-                    `;
+                    html += `<div class="bg-gray-50 p-3 rounded-lg"><div class="flex justify-between items-start"><div><p class="font-bold text-md text-blue-800">${app.client}</p><p class="text-xs text-gray-500">${app.address}</p>${app.description ? `<p class="text-xs text-gray-800 mt-1 italic">"${app.description}"</p>` : ''}</div><span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap">${app.startTime} (${formatDuration(app.duration)})</span></div><div class="mt-3 flex items-center justify-between"><span class="text-sm font-medium text-gray-600">${formattedDate}</span><div class="flex items-center gap-2"><button onclick="openEditModal('${app.id}')" class="text-xs bg-gray-500 hover:bg-gray-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Modifica</button><button onclick="openReassignModal('${app.id}')" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Riassegna</button><button onclick="openDeleteModal('${app.id}')" class="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md transition-colors">Cancella</button></div></div></div>`;
                 });
                 html += `</div></div>`;
             });
@@ -815,72 +787,44 @@
             const container = document.getElementById('archive-container');
             const searchTerm = document.getElementById('archive-search').value.toLowerCase();
             const selectedDate = document.getElementById('archive-date').value;
-
             let appointmentsToShow = archivedAppointments;
-
             if (searchTerm) {
-                appointmentsToShow = appointmentsToShow.filter(app => 
-                    app.client.toLowerCase().includes(searchTerm) || 
-                    app.address.toLowerCase().includes(searchTerm)
-                );
+                appointmentsToShow = appointmentsToShow.filter(app => app.client.toLowerCase().includes(searchTerm) || app.address.toLowerCase().includes(searchTerm));
             }
             if (selectedDate) {
                  appointmentsToShow = appointmentsToShow.filter(app => app.date === selectedDate);
             }
-
             appointmentsToShow.sort((a, b) => b.date.localeCompare(a.date) || a.startTime.localeCompare(b.startTime));
-
             if (appointmentsToShow.length === 0) {
                 container.innerHTML = '<p class="text-center text-gray-500 py-8">Nessun intervento trovato nell\'archivio per i criteri selezionati.</p>';
                 return;
             }
-
             let html = '';
             appointmentsToShow.forEach(app => {
                 const tech = technicians.find(t => t.id === app.technicianId);
                 const formattedDate = new Date(app.date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                html += `
-                    <div class="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div class="flex-grow">
-                            <p class="font-bold text-gray-800">${app.client}</p>
-                            <p class="text-sm text-gray-600">${app.address}</p>
-                             ${app.description ? `<p class="text-xs text-gray-700 mt-1 italic">"${app.description}"</p>` : ''}
-                        </div>
-                        <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-sm">
-                            <span class="font-semibold text-gray-700">${formattedDate}</span>
-                            <span class="bg-gray-200 text-gray-800 font-semibold px-2 py-1 rounded">${app.startTime} (${formatDuration(app.duration)})</span>
-                            <span class="flex items-center gap-2">
-                                <span class="h-3 w-3 rounded-full" style="background-color: ${tech ? tech.color : 'gray'}"></span>
-                                <span class="font-medium">${tech ? tech.name : 'N/D'}</span>
-                            </span>
-                        </div>
-                    </div>
-                `;
+                html += `<div class="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div class="flex-grow"><p class="font-bold text-gray-800">${app.client}</p><p class="text-sm text-gray-600">${app.address}</p>${app.description ? `<p class="text-xs text-gray-700 mt-1 italic">"${app.description}"</p>` : ''}</div><div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-sm"><span class="font-semibold text-gray-700">${formattedDate}</span><span class="bg-gray-200 text-gray-800 font-semibold px-2 py-1 rounded">${app.startTime} (${formatDuration(app.duration)})</span><span class="flex items-center gap-2"><span class="h-3 w-3 rounded-full" style="background-color: ${tech ? tech.color : 'gray'}"></span><span class="font-medium">${tech ? tech.name : 'N/D'}</span></span></div></div>`;
             });
             container.innerHTML = html;
         }
-
 
         let mapMarkers = [];
         function updateMap() {
             if (!map) return;
             mapMarkers.forEach(marker => marker.setMap(null));
             mapMarkers = [];
-
             const selectedDate = document.getElementById('map-date-filter').value;
             const today = new Date().toISOString().split('T')[0];
             const dateToDisplay = selectedDate || today; 
-
             document.getElementById('map-date-filter').value = dateToDisplay;
-
             const appointmentsForDay = existingAppointments.filter(app => app.date === dateToDisplay);
-            
             const mapDiv = document.getElementById('map');
             if (mapDiv.innerHTML.includes("Nessun appuntamento")) {
                  mapDiv.innerHTML = '';
-                 map = new google.maps.Map(document.getElementById("map"), { center: { lat: 40.8518, lng: 14.2681 }, zoom: 8, mapTypeControl: false, streetViewControl: false });
+                 if(!map.getCenter()) {
+                    map = new google.maps.Map(document.getElementById("map"), { center: { lat: 40.8518, lng: 14.2681 }, zoom: 8, mapTypeControl: false, streetViewControl: false });
+                 }
             }
-
             if (appointmentsForDay.length === 0) {
                 if(typeof map.setCenter === 'function') {
                     map.setCenter({ lat: 40.8518, lng: 14.2681 });
@@ -889,27 +833,17 @@
                  mapDiv.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-500 font-semibold">Nessun appuntamento per ${new Date(dateToDisplay+'T12:00:00').toLocaleDateString('it-IT', {day: 'numeric', month: 'long'})}.</p></div>`;
                 return;
             }
-
             const bounds = new google.maps.LatLngBounds();
-
             appointmentsForDay.forEach(app => {
                 const tech = technicians.find(t => t.id === app.technicianId);
                 const position = { lat: app.lat, lng: app.lng };
-                const markerIcon = {
-                    path: 'M12 2C8.1 2 5 5.1 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.9-3.1-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
-                    fillColor: tech ? tech.color : 'gray',
-                    fillOpacity: 1,
-                    strokeWeight: 0,
-                    scale: 1.5,
-                    anchor: new google.maps.Point(12, 24),
-                };
+                const markerIcon = { path: 'M12 2C8.1 2 5 5.1 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.9-3.1-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z', fillColor: tech ? tech.color : 'gray', fillOpacity: 1, strokeWeight: 0, scale: 1.5, anchor: new google.maps.Point(12, 24), };
                 const marker = new google.maps.Marker({ position, map, title: app.client, icon: markerIcon });
                 const infoWindow = new google.maps.InfoWindow({ content: `<div class="p-1"><p class="font-bold">${app.client}</p><p>${app.address}</p><p><strong>Orario:</strong> ${app.startTime} (${formatDuration(app.duration)})</p><p><strong>Tecnico:</strong> ${tech ? tech.name : 'N/A'}</p></div>` });
                 marker.addListener('click', () => { infoWindow.open(map, marker); });
                 mapMarkers.push(marker);
                 bounds.extend(position);
             });
-
             if (appointmentsForDay.length > 0) {
                 map.fitBounds(bounds);
                 if (appointmentsForDay.length === 1) { map.setZoom(12); }
@@ -921,19 +855,17 @@
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowString = tomorrow.toISOString().split('T')[0];
-            
             const todayAppointments = existingAppointments.filter(a => a.date === today);
             const tomorrowAppointments = existingAppointments.filter(a => a.date === tomorrowString);
-            
             document.getElementById('dash-today').textContent = todayAppointments.length;
             document.getElementById('dash-tomorrow').textContent = tomorrowAppointments.length;
             document.getElementById('dash-total').textContent = existingAppointments.length;
-            
             const busyTechsToday = new Set(todayAppointments.map(a => a.technicianId)).size;
             document.getElementById('dash-techs').textContent = `${busyTechsToday} / ${technicians.length}`;
         }
 
         function updateAll() {
+            console.log("Updating all UI components...");
             updateDashboardCards();
             if (document.getElementById('content-summary').classList.contains('hidden') === false) {
                  displayDailySummary();
@@ -946,52 +878,27 @@
 
         function switchTab(tab, event) {
             if (event) event.preventDefault();
-            
             const tabs = ['dashboard', 'planner', 'summary', 'archive'];
             const tabTitles = { dashboard: 'Home', planner: 'Pianificazione', summary: 'Riepilogo', archive: 'Archivio' };
-
             tabs.forEach(t => {
                 document.getElementById(`content-${t}`).classList.add('hidden');
                 document.getElementById(`tab-${t}`).classList.remove('active');
             });
-
             document.getElementById(`content-${tab}`).classList.remove('hidden');
             document.getElementById(`tab-${tab}`).classList.add('active');
             document.getElementById('mobile-page-title').textContent = tabTitles[tab];
-
-            // Close sidebar on mobile
             const sidebar = document.getElementById('sidebar');
             if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
                 document.getElementById('mobile-menu-button').click();
             }
-            
             if (tab === 'summary' || tab === 'archive' || tab === 'dashboard') {
                 updateAll();
             }
         }
 
-        // --- Funzioni di Navigazione Dashboard ---
-        function viewToday() {
-            const todayString = new Date().toISOString().split('T')[0];
-            document.getElementById('summary-date').value = todayString;
-            document.getElementById('client-search').value = '';
-            switchTab('summary');
-        }
-
-        function viewTomorrow() {
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const tomorrowString = tomorrow.toISOString().split('T')[0];
-            document.getElementById('summary-date').value = tomorrowString;
-            document.getElementById('client-search').value = '';
-            switchTab('summary');
-        }
-
-        function viewTotal() {
-            document.getElementById('summary-date').value = '';
-            document.getElementById('client-search').value = ''; 
-            switchTab('summary');
-        }
+        function viewToday() { const todayString = new Date().toISOString().split('T')[0]; document.getElementById('summary-date').value = todayString; document.getElementById('client-search').value = ''; switchTab('summary'); }
+        function viewTomorrow() { const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); const tomorrowString = tomorrow.toISOString().split('T')[0]; document.getElementById('summary-date').value = tomorrowString; document.getElementById('client-search').value = ''; switchTab('summary'); }
+        function viewTotal() { document.getElementById('summary-date').value = ''; document.getElementById('client-search').value = ''; switchTab('summary'); }
 
     </script>
 </body>
