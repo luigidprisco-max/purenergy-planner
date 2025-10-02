@@ -1,535 +1,999 @@
 <!DOCTYPE html>
 <html lang="it">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PurEnergy Planner - Gestionale</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         .loader {
-            border: 4px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 4px solid #3498db;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
+            border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3b82f6;
+            width: 30px; height: 30px; animation: spin 1s linear infinite;
         }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-        
-        .pac-container {
-            z-index: 1050 !important;
-        }
-        
-        .sidebar-link:hover, .sidebar-link-active {
-            background-color: #4f46e5; /* Indigo 600 */
-        }
-        .sidebar-link:hover, .sidebar-link-active, .sidebar-link-active i, .sidebar-link-active span {
-            color: white;
-        }
-        .dashboard-card {
-             transition: all 0.2s ease-in-out;
-        }
-        .dashboard-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .pac-container { z-index: 1050 !important; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .sidebar-link { transition: all 0.2s ease-in-out; }
+        .sidebar-link.active { background-color: #2563eb; color: white; }
+        .sidebar-link:not(.active):hover { background-color: #3b82f6; color: white; }
+        .dashboard-card { transition: all 0.2s ease-in-out; cursor: pointer; }
+        .dashboard-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
     </style>
 </head>
+<body class="text-gray-800">
 
-<body class="bg-gray-100 text-gray-800">
-    <div class="flex h-screen overflow-hidden">
+    <div class="relative min-h-screen md:flex">
         
         <!-- Mobile menu overlay -->
-        <div id="mobile-menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden hidden"></div>
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden hidden"></div>
 
         <!-- Sidebar -->
-        <aside id="sidebar" class="bg-gray-800 text-gray-200 w-64 space-y-6 py-7 px-2 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-200 ease-in-out z-30">
-            <div id="sidebar-header" class="flex items-center justify-center px-4">
-                 <span class="text-white text-2xl font-extrabold">PurEnergy Planner</span>
+        <div id="sidebar" class="bg-gray-800 text-white w-64 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 transition duration-300 ease-in-out z-30">
+            <div class="flex items-center justify-center h-16 bg-gray-900">
+                <span class="text-white font-bold uppercase text-lg">PurEnergy Planner</span>
             </div>
-
-            <nav>
-                <a href="#" onclick="window.switchTab('dashboard', event)" id="tab-dashboard" class="tab-link sidebar-link-active sidebar-link flex items-center space-x-2 py-2.5 px-4 rounded-lg transition duration-200">
-                    <i class="fas fa-home w-6 text-center"></i>
-                    <span>Home</span>
+            <nav class="flex-1 px-2 py-4">
+                <a href="#" onclick="switchTab('dashboard', event)" id="tab-dashboard" class="sidebar-link active flex items-center px-4 py-2 text-gray-100 rounded-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                    Home
                 </a>
-                <a href="#" onclick="window.switchTab('planner', event)" id="tab-planner" class="tab-link sidebar-link flex items-center space-x-2 py-2.5 px-4 rounded-lg transition duration-200">
-                    <i class="fas fa-calendar-alt w-6 text-center"></i>
-                    <span>Pianificazione</span>
+                <a href="#" onclick="switchTab('planner', event)" id="tab-planner" class="sidebar-link flex items-center px-4 py-2 mt-2 text-gray-100 rounded-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    Pianificazione
                 </a>
-                <a href="#" onclick="window.switchTab('summary', event)" id="tab-summary" class="tab-link sidebar-link flex items-center space-x-2 py-2.5 px-4 rounded-lg transition duration-200">
-                    <i class="fas fa-chart-bar w-6 text-center"></i>
-                    <span>Riepilogo</span>
+                <a href="#" onclick="switchTab('summary', event)" id="tab-summary" class="sidebar-link flex items-center px-4 py-2 mt-2 text-gray-100 rounded-md">
+                   <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                    Riepilogo
                 </a>
-                <a href="#" onclick="window.switchTab('archive', event)" id="tab-archive" class="tab-link sidebar-link flex items-center space-x-2 py-2.5 px-4 rounded-lg transition duration-200">
-                     <i class="fas fa-archive w-6 text-center"></i>
-                    <span>Archivio</span>
+                <a href="#" onclick="switchTab('archive', event)" id="tab-archive" class="sidebar-link flex items-center px-4 py-2 mt-2 text-gray-100 rounded-md">
+                   <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+                    Archivio
                 </a>
             </nav>
-        </aside>
+        </div>
 
         <!-- Main content -->
-        <div class="flex-1 flex flex-col overflow-hidden">
-            <!-- Header -->
-             <header class="bg-white shadow-md p-4 flex items-center justify-between">
-                <button id="mobile-menu-button" class="md:hidden text-gray-600">
-                    <i class="fas fa-bars text-2xl"></i>
+        <div class="flex-1 flex flex-col">
+            <!-- Mobile Header -->
+            <header class="md:hidden bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+                <button id="mobile-menu-button" class="text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                 </button>
-                <h1 id="mobile-page-title" class="text-2xl font-bold text-gray-700">Home</h1>
-                 <div class="w-8"></div> <!-- Spacer -->
+                <h1 id="mobile-page-title" class="font-bold text-lg text-gray-800">Home</h1>
+                 <div class="w-6"></div> <!-- Spacer -->
             </header>
 
-            <main id="app-container" class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4 md:p-8">
+            <main class="flex-1 p-4 md:p-8">
+                <div id="api-key-alert"></div>
                 
-                <div id="auth-error" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
-                    Errore di autenticazione.
-                </div>
-
                 <!-- Dashboard Content -->
-                <div id="content-dashboard" class="content-view">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <!-- Card Interventi Oggi -->
-                        <div class="dashboard-card bg-green-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold uppercase">Interventi Oggi</h3>
-                                <p class="text-5xl font-bold mt-2" id="dash-today">0</p>
-                            </div>
-                            <div class="text-right text-3xl opacity-70">
-                                <i class="fas fa-calendar-day"></i>
-                            </div>
+                <div id="content-dashboard">
+                     <h2 class="text-2xl md:text-3xl font-bold mb-6 text-gray-800">Home</h2>
+                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div onclick="viewToday()" class="dashboard-card bg-green-500 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+                            <div><p class="text-lg font-semibold">INTERVENTI OGGI</p><p id="dash-today" class="text-3xl md:text-4xl font-bold">0</p></div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 self-end opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         </div>
-                        <!-- Card Interventi Domani -->
-                        <div class="dashboard-card bg-yellow-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold uppercase">Interventi Domani</h3>
-                                <p class="text-5xl font-bold mt-2" id="dash-tomorrow">0</p>
-                            </div>
-                             <div class="text-right text-3xl opacity-70">
-                                <i class="fas fa-clock"></i>
-                            </div>
+                        <div onclick="viewTomorrow()" class="dashboard-card bg-yellow-500 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+                             <div><p class="text-lg font-semibold">INTERVENTI DOMANI</p><p id="dash-tomorrow" class="text-3xl md:text-4xl font-bold">0</p></div>
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 self-end opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
-                        <!-- Card Interventi Futuri -->
-                        <div class="dashboard-card bg-blue-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-between">
-                             <div>
-                                <h3 class="text-lg font-semibold uppercase">Interventi Futuri</h3>
-                                <p class="text-5xl font-bold mt-2" id="dash-future">0</p>
-                            </div>
-                             <div class="text-right text-3xl opacity-70">
-                                <i class="fas fa-calendar-alt"></i>
-                            </div>
+                        <div onclick="viewTotal()" class="dashboard-card bg-blue-500 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+                             <div><p class="text-lg font-semibold">INTERVENTI FUTURI</p><p id="dash-total" class="text-3xl md:text-4xl font-bold">0</p></div>
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 self-end opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m-1 4h1m5-4h1m-1 4h1" /></svg>
                         </div>
-                        <!-- Card Tecnici Occupati -->
-                         <div class="dashboard-card bg-teal-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-between">
-                            <div>
-                                <h3 class="text-lg font-semibold uppercase">Tecnici Occupati Oggi</h3>
-                                <p class="text-5xl font-bold mt-2" id="dash-techs-today">0 / 3</p>
-                            </div>
-                             <div class="text-right text-3xl opacity-70">
-                                <i class="fas fa-users"></i>
-                            </div>
+                         <div onclick="viewToday()" class="dashboard-card bg-teal-500 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+                             <div><p class="text-lg font-semibold">TECNICI OCCUPATI OGGI</p><p id="dash-techs" class="text-3xl md:text-4xl font-bold">0 / 3</p></div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 self-end opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.28-1.25-.7-1.693M7 20v-2c0-.653.28-1.25.7-1.693M7 20H2v-2a3 3 0 015.356-1.857M12 12a3 3 0 100-6 3 3 0 000 6z" /></svg>
                         </div>
-                    </div>
+                     </div>
                 </div>
-
 
                 <!-- Planner Content -->
-                <div id="content-planner" class="content-view hidden">
-                    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-4xl mx-auto">
-                        <h2 class="text-3xl font-bold text-gray-800 mb-6">Trova Disponibilità</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="client-search" class="block text-sm font-medium text-gray-700">Indirizzo Cliente</label>
-                                <input type="text" id="client-search" placeholder="Es: Via Roma 1, Napoli" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <div id="content-planner" class="hidden">
+                    <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div class="md:col-span-2">
+                                <label for="address" class="block font-semibold text-gray-700 mb-1">Indirizzo Cliente:</label>
+                                <input type="text" id="address" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Inizia a digitare l'indirizzo...">
                             </div>
                             <div>
-                                <label for="summary-date-planner" class="block text-sm font-medium text-gray-700">Data (opzionale)</label>
-                                <input type="date" id="summary-date-planner" class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <label for="duration" class="block font-semibold text-gray-700 mb-1">Durata Intervento:</label>
+                                <select id="duration" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="30">30 minuti</option>
+                                    <option value="60" selected>1 ora</option>
+                                    <option value="120">2 ore</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="manual-date" class="block font-semibold text-gray-700 mb-1">Data Specifica (Opzionale):</label>
+                                 <input type="date" id="manual-date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                             </div>
                         </div>
-                        <div class="mt-6 flex justify-end">
-                            <button id="search-availability" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-colors duration-200 flex items-center">
-                                <i class="fas fa-search mr-2"></i>Cerca
+                         <div class="mt-4">
+                            <button onclick="handleAddressCheck()" id="search-button" class="w-full bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                                <span>Cerca Disponibilità</span>
                             </button>
                         </div>
-                        <div id="loader" class="hidden mt-4 mx-auto loader"></div>
-                        <div id="availability-results" class="mt-8"></div>
+                        <div id="loader" class="hidden flex justify-center mt-4"><div class="loader"></div></div>
+                        <div id="info-message" class="mt-4 text-center text-sm font-medium"></div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                        <div class="lg:col-span-3 bg-white p-4 rounded-2xl shadow-lg">
+                            <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+                                <h2 class="text-xl font-semibold text-gray-700">Mappa Interventi</h2>
+                                <div class="flex items-center gap-2">
+                                    <label for="map-date-filter" class="text-sm font-medium">Filtra per giorno:</label>
+                                    <input type="date" id="map-date-filter" onchange="updateMap()" class="px-2 py-1 border rounded-lg text-sm">
+                                </div>
+                            </div>
+                            <div id="map" class="w-full h-96 md:h-[600px] rounded-lg bg-gray-200 flex items-center justify-center text-center p-4"></div>
+                        </div>
+                        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-lg">
+                            <h2 class="text-xl font-semibold mb-4 text-gray-700">Prossima Disponibilità</h2>
+                            <div id="results"><p class="text-gray-500">I risultati della ricerca verranno mostrati qui.</p></div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Summary Content -->
-                <div id="content-summary" class="content-view hidden">
-                    <div class="bg-white p-8 rounded-2xl shadow-xl">
-                         <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-3xl font-bold text-gray-800">Riepilogo Appuntamenti</h2>
-                             <input type="date" id="summary-date" class="border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <div id="content-summary" class="hidden">
+                     <div class="bg-white p-6 rounded-2xl shadow-lg mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="summary-date" class="block font-semibold text-gray-700 mb-1">Filtra per data:</label>
+                                <input type="date" id="summary-date" onchange="displayDailySummary()" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                             <div>
+                                <label for="client-search" class="block font-semibold text-gray-700 mb-1">Cerca cliente (in tutti gli app. futuri):</label>
+                                <input type="text" id="client-search" onkeyup="displayDailySummary()" class="w-full px-3 py-2 border rounded-lg" placeholder="Nome cliente...">
+                            </div>
                         </div>
-                        <div id="summary-view" class="space-y-4"></div>
-                         <div id="map" class="mt-6 w-full h-96 rounded-lg shadow-md bg-gray-200"></div>
                     </div>
-                </div>
-                 <!-- Archive Content -->
-                <div id="content-archive" class="content-view hidden">
-                     <div class="bg-white p-8 rounded-2xl shadow-xl">
-                        <h2 class="text-3xl font-bold text-gray-800 mb-6">Archivio Appuntamenti</h2>
-                        <div id="archive-view" class="space-y-4"></div>
-                    </div>
+                    <div id="summary-container"></div>
                 </div>
 
+                <!-- Archive Content -->
+                <div id="content-archive" class="hidden">
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Archivio Interventi Passati</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="archive-search" class="block font-semibold text-gray-700 mb-1">Cerca per cliente o indirizzo:</label>
+                                <input type="text" id="archive-search" onkeyup="displayArchive()" class="w-full px-3 py-2 border rounded-lg" placeholder="Nome, indirizzo...">
+                            </div>
+                             <div>
+                                <label for="archive-date" class="block font-semibold text-gray-700 mb-1">Filtra per data:</label>
+                                <input type="date" id="archive-date" onchange="displayArchive()" class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                        </div>
+                        <div id="archive-container" class="space-y-3"></div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
-    
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, doc, setDoc, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyAE3mj6ePvieSdSJtidGAj08UbTYIAoSP4",
-            authDomain: "purenergy-planner-8bce1.firebaseapp.com",
-            projectId: "purenergy-planner-8bce1",
-            storageBucket: "purenergy-planner-8bce1.firebasestorage.app",
-            messagingSenderId: "1004722434971",
-            appId: "1:1004722434971:web:23aec52fbefde3f6d9673e"
-        };
+    <!-- Modals -->
+    <div id="client-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4">Conferma Appuntamento</h2>
+            <p id="modal-details" class="text-gray-600 mb-6"></p>
+            <div class="mb-4">
+                <label for="client-name" class="block text-gray-700 text-sm font-bold mb-2">Nome e Cognome Cliente:</label>
+                <input type="text" id="client-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Mario Rossi">
+                <p id="modal-error" class="text-red-500 text-xs italic mt-2 hidden">Il nome è obbligatorio.</p>
+            </div>
+             <div class="mb-4">
+                <label for="client-description" class="block text-gray-700 text-sm font-bold mb-2">Note / Descrizione:</label>
+                <textarea id="client-description" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Dettagli intervento..."></textarea>
+            </div>
+            <div class="flex items-center justify-end space-x-4 mt-8">
+                <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Annulla</button>
+                <button id="modal-confirm-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4">Modifica Appuntamento</h2>
+            <input type="hidden" id="edit-appointment-id">
+            <div class="mb-4">
+                <label for="edit-client-name" class="block text-gray-700 text-sm font-bold mb-2">Nome e Cognome Cliente:</label>
+                <input type="text" id="edit-client-name" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+            </div>
+             <div class="mb-4">
+                <label for="edit-client-description" class="block text-gray-700 text-sm font-bold mb-2">Note / Descrizione:</label>
+                <textarea id="edit-client-description" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="edit-duration" class="block text-gray-700 text-sm font-bold mb-2">Nuova Durata:</label>
+                    <select id="edit-duration" onchange="updateAvailableTimesInModal()" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="30">30 minuti</option>
+                        <option value="60">1 ora</option>
+                        <option value="120">2 ore</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="edit-start-time" class="block text-gray-700 text-sm font-bold mb-2">Nuovo Orario:</label>
+                    <select id="edit-start-time" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+            </div>
+            <p id="edit-modal-details" class="text-sm text-gray-500 mt-4"></p>
+            <p id="edit-modal-error" class="text-red-500 text-sm mt-4 hidden"></p>
+            <div class="flex items-center justify-end space-x-4 mt-8">
+                <button onclick="closeEditModal()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Annulla</button>
+                <button onclick="saveAppointmentChanges()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Salva Modifiche</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4 text-red-600">Conferma Cancellazione</h2>
+            <p id="delete-modal-details" class="text-gray-600 mb-6"></p>
+            <div class="flex items-center justify-end space-x-4 mt-8">
+                <button onclick="closeDeleteModal()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Annulla</button>
+                <button id="delete-modal-confirm-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Conferma Cancellazione</button>
+            </div>
+        </div>
+    </div>
+    <div id="reassign-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-60 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-4">Riassegna Appuntamento</h2>
+            <p id="reassign-modal-details" class="text-gray-600 mb-6"></p>
+             <div class="mb-4">
+                <label for="reassign-tech" class="block text-gray-700 text-sm font-bold mb-2">Nuovo Tecnico:</label>
+                <select id="reassign-tech" class="shadow appearance-none border rounded w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></select>
+            </div>
+            <div class="flex items-center justify-end space-x-4 mt-8">
+                <button onclick="closeReassignModal()" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Annulla</button>
+                <button id="reassign-modal-confirm-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition-colors">Riassegna</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- CONFIGURAZIONE ---
+        const API_KEY = "AIzaSyAwdbFG2Fh4d69MgNXa375YA9JCD-NKXPo";
+        const PROXIMITY_RADIUS_KM_DEFAULT = 50;
+        const HIGH_DENSITY_PROVINCES = { "Napoli": 15, "Salerno": 15, "Caserta": 20 };
+        const technicians = [ { id: 1, name: "DANIELE", color: "red" }, { id: 2, name: "ERNESTO", color: "green" }, { id: 3, name: "CARMINE", color: "purple" } ];
+        const WORK_DAY_START_MINUTES = 8 * 60 + 30; // 08:30
+        const WORK_DAY_END_MINUTES = 18 * 60; // 18:00
+        const SLOT_INCREMENT_MINUTES = 30; // Controlla disponibilità ogni 30 min
+        const LUNCH_BREAK_DURATION = 60; // 1 ora
+        const LUNCH_WINDOW_START_MINUTES = 12 * 60; // 12:00
+        const LUNCH_WINDOW_END_MINUTES = 14 * 60;   // 14:00
+        const LATEST_APPOINTMENT_START_MINUTES = 15 * 60 + 30; // 15:30
+        const TRAVEL_TIME_MINUTES = 30; // 30 min di spostamento
         
-        let app, db, auth, userId;
-        let appointments = new Map();
-        const technicians = ['Daniele', 'Carmine', 'Ernesto'];
+        let allAppointments = [];
+        let existingAppointments = [];
+        let archivedAppointments = [];
 
-        const signInAndInitialize = async () => {
-            try {
-                app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
+        let map, geocoder, newCustomerLocation, distanceService;
+        let autocomplete;
+        let nextAppointmentId = 102; // Start from a higher number to avoid collision with initial data
 
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        console.log("User signed in:", userId);
-                        document.getElementById('auth-error').classList.add('hidden');
-                        listenForAppointments();
+        // --- FUNZIONI DI UTILITA' ---
+        const timeToMinutes = (timeStr) => { const [h, m] = timeStr.split(':').map(Number); return h * 60 + m; };
+        const minutesToTime = (minutes) => { const h = Math.floor(minutes / 60).toString().padStart(2, '0'); const m = (minutes % 60).toString().padStart(2, '0'); return `${h}:${m}`; };
+        const formatDuration = (minutes) => { if (minutes >= 60) { const hours = minutes / 60; const plural = hours > 1 ? 'e' : 'a'; return `${hours} or${plural}`; } return `${minutes} minuti`; };
+        
+
+        // --- FUNZIONI PRINCIPALI ---
+        function gm_authFailure() { console.error("Google Maps Authentication Failure."); document.getElementById('map').innerHTML = `<div class="p-4 bg-red-100 text-red-800 rounded-lg text-left"><p class="font-bold">Errore di Autenticazione Google Maps</p><p>Controlla che la chiave API sia corretta, che la fatturazione sia attiva e che le API necessarie (Maps, Geocoding, Places, Distance Matrix) siano abilitate.</p></div>`; }
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // Mobile navigation
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+
+            const toggleSidebar = () => {
+                sidebar.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+            };
+
+            mobileMenuButton.addEventListener('click', toggleSidebar);
+            overlay.addEventListener('click', toggleSidebar);
+
+
+            if (!API_KEY) {
+                document.getElementById('api-key-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Manca la Chiave API</p><p>Inserisci la chiave API di Google Maps.</p></div>`;
+                document.getElementById('search-button').disabled = true;
+                document.getElementById('search-button').classList.add('opacity-50', 'cursor-not-allowed');
+                document.getElementById('address').disabled = true;
+                document.getElementById('map').innerHTML = '<p class="text-gray-500 font-semibold">Mappa disattivata.</p>';
+            } else {
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap&libraries=geometry,places`;
+                script.async = true;
+                script.defer = true;
+                document.head.appendChild(script);
+            }
+            const today = new Date();
+            const todayString = today.toISOString().split('T')[0];
+            document.getElementById('summary-date').value = todayString;
+            document.getElementById('manual-date').min = todayString;
+            document.getElementById('map-date-filter').min = todayString;
+            
+            // --- DATI DI ESEMPIO ---
+            const dayAfterTomorrow = new Date();
+            dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+            const dayAfterTomorrowString = dayAfterTomorrow.toISOString().split('T')[0];
+            
+            const threeDaysLater = new Date();
+            threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+            const threeDaysLaterString = threeDaysLater.toISOString().split('T')[0];
+            
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayString = yesterday.toISOString().split('T')[0];
+
+            allAppointments = [ 
+                { id: 101, date: yesterdayString, client: "Cliente Archiviato", address: "Via del Passato 1, Roma, RM", lat: 41.9028, lng: 12.4964, startTime: "10:00", duration: 120, description: "Controllo annuale", technicianId: 1 },
+                { id: 1, date: dayAfterTomorrowString, client: "Cliente Napoli", address: "Corso Umberto I, Napoli", lat: 40.8488, lng: 14.2592, startTime: "10:00", duration: 120, description: "Installazione", technicianId: 1 },
+                { id: 2, date: dayAfterTomorrowString, client: "Cliente Nocera", address: "Via Roma, Nocera Inferiore, SA", lat: 40.745, lng: 14.640, startTime: "09:00", duration: 60, description: "", technicianId: 3 },
+                { id: 3, date: threeDaysLaterString, client: "Cliente Caserta", address: "Viale Vittorio Veneto, Caserta, CE", lat: 41.07, lng: 14.33, startTime: "09:00", duration: 60, description: "Manutenzione", technicianId: 1 },
+            ];
+
+            // --- SEPARAZIONE ARCHIVIATI / ESISTENTI ---
+            const todayForFilter = new Date().toISOString().split('T')[0];
+            existingAppointments = allAppointments.filter(app => app.date >= todayForFilter);
+            archivedAppointments = allAppointments.filter(app => app.date < todayForFilter);
+            
+            updateAll();
+        });
+        
+        function initMap() { 
+            console.log("Google Maps API caricata."); 
+            geocoder = new google.maps.Geocoder();
+            distanceService = new google.maps.DistanceMatrixService();
+            map = new google.maps.Map(document.getElementById("map"), { center: { lat: 41.8719, lng: 12.5674 }, zoom: 6, mapTypeControl: false, streetViewControl: false });
+            const addressInput = document.getElementById('address');
+            autocomplete = new google.maps.places.Autocomplete(addressInput, { componentRestrictions: { country: "it" }, fields: ["formatted_address", "geometry", "address_components"], strictBounds: false });
+            updateMap(); 
+        }
+
+        async function getDrivingDistance(origin, destination) {
+            return new Promise((resolve) => {
+                 if(!distanceService) {
+                    console.warn("DistanceMatrixService not initialized yet, using spherical distance.");
+                    resolve({ distance: google.maps.geometry.spherical.computeDistanceBetween(origin, destination) / 1000, isEstimate: true });
+                    return;
+                }
+                distanceService.getDistanceMatrix({
+                    origins: [origin],
+                    destinations: [destination],
+                    travelMode: 'DRIVING',
+                }, (response, status) => {
+                    if (status === 'OK' && response.rows[0].elements[0].status === 'OK') {
+                        resolve({ distance: response.rows[0].elements[0].distance.value / 1000, isEstimate: false });
                     } else {
-                        await signInAnonymously(auth);
+                        console.warn('Distance Matrix error, falling back to spherical', status);
+                        resolve({ distance: google.maps.geometry.spherical.computeDistanceBetween(origin, destination) / 1000, isEstimate: true });
                     }
                 });
-
-            } catch (error) {
-                console.error("Firebase Initialization or Auth Error:", error);
-                const errorElement = document.getElementById('auth-error');
-                errorElement.textContent = `Errore di autenticazione: ${error.code}. Dettagli: ${error.message}. Assicurati che il dominio sia autorizzato nelle impostazioni di Authentication di Firebase e che la chiave API di Google Maps sia configurata correttamente in Google Cloud.`;
-                errorElement.classList.remove('hidden');
-            }
-        };
-
-        function listenForAppointments() {
-            if (!userId) return;
-            const q = query(collection(db, `users/${userId}/appointments`));
-            onSnapshot(q, (snapshot) => {
-                const appointmentsArray = [];
-                snapshot.forEach((doc) => {
-                    appointmentsArray.push({ id: doc.id, ...doc.data() });
-                });
-                appointments = new Map(appointmentsArray.map(apt => [apt.id, apt]));
-                console.log("Appointments updated:", appointments.size);
-                updateAll();
             });
         }
         
+        async function handleAddressCheck() { 
+            const address = document.getElementById('address').value; 
+            const manualDate = document.getElementById('manual-date').value;
+            const duration = parseInt(document.getElementById('duration').value);
+            if (!address) { document.getElementById('info-message').innerHTML = `<p class="text-yellow-600">Inserisci un indirizzo.</p>`; return; } 
+            document.getElementById('loader').classList.remove('hidden'); 
+            document.getElementById('info-message').textContent = 'Ricerca indirizzo...'; 
+            
+            geocoder.geocode({ 'address': address, 'componentRestrictions': { country: 'IT' } }, async (results, status) => { 
+                document.getElementById('loader').classList.add('hidden'); 
+                if (status === 'OK') { 
+                    newCustomerLocation = results[0].geometry.location; 
+                    const province = getProvinceFromAddressComponents(results[0].address_components);
+                    document.getElementById('info-message').innerHTML = `<p class="text-blue-600">Indirizzo trovato in provincia di ${province || 'sconosciuta'}. Calcolo disponibilità...</p>`; 
+                    await findBestAppointmentSlot(manualDate, province, duration); 
+                } else { 
+                    document.getElementById('info-message').innerHTML = `<p class="text-red-600">Indirizzo non trovato in Italia. Errore: ${status}</p>`; 
+                } 
+            }); 
+        }
+        
+        function getProvinceFromAddressComponents(components) {
+            const provinceComponent = components.find(c => c.types.includes("administrative_area_level_2"));
+            return provinceComponent ? provinceComponent.long_name : null;
+        }
+        
+        function canScheduleLunch(workSchedule) {
+            const lunchSearchEnd = LUNCH_WINDOW_END_MINUTES - LUNCH_BREAK_DURATION;
+
+            // Tentiamo di posizionare un blocco per il pranzo
+            for (let lunchStart = LUNCH_WINDOW_START_MINUTES; lunchStart <= lunchSearchEnd; lunchStart += SLOT_INCREMENT_MINUTES) {
+                const lunchBlock = { start: lunchStart, end: lunchStart + LUNCH_BREAK_DURATION, type: 'lunch' };
+
+                // 1. Controlla se il pranzo si sovrappone direttamente a un lavoro. Se sì, questo slot è impossibile.
+                const lunchOverlapsWork = workSchedule.some(work =>
+                    lunchBlock.start < work.end && lunchBlock.end > work.start
+                );
+                if (lunchOverlapsWork) {
+                    continue; // Prova il prossimo orario di inizio per il pranzo
+                }
+
+                // 2. Crea un'agenda completa (lavori + questo tentativo di pranzo)
+                const fullSchedule = [...workSchedule.map(w => ({...w, type: 'work'})), lunchBlock];
+                fullSchedule.sort((a, b) => a.start - b.start);
+
+                // 3. Controlla se l'agenda completa è valida, considerando i tempi di spostamento
+                let isThisPlacementValid = true;
+                for (let i = 0; i < fullSchedule.length - 1; i++) {
+                    const currentEvent = fullSchedule[i];
+                    const nextEvent = fullSchedule[i+1];
+
+                    let requiredGap = TRAVEL_TIME_MINUTES;
+
+                    // CASO SPECIALE: Se un lavoro è seguito immediatamente dal pranzo, non c'è tempo di spostamento in mezzo.
+                    if (currentEvent.type === 'work' && nextEvent.type === 'lunch' && currentEvent.end === nextEvent.start) {
+                        requiredGap = 0;
+                    }
+
+                    // Se la fine dell'evento corrente + il tempo di spostamento necessario si sovrappone all'inizio del prossimo, è un conflitto.
+                    if (currentEvent.end + requiredGap > nextEvent.start) {
+                        isThisPlacementValid = false;
+                        break; // Conflitto rilevato, questo posizionamento del pranzo non è valido
+                    }
+                }
+
+                if (isThisPlacementValid) {
+                    return true; // Trovato un posizionamento valido per la pausa pranzo
+                }
+            }
+
+            return false; // Provati tutti gli orari possibili per il pranzo, nessuno ha funzionato
+        }
+
+        function calculateAvailableSlots(techAppointments, requiredDuration) {
+            const availableSlots = [];
+
+            // Itera su tutti i possibili orari di inizio per il NUOVO appuntamento
+            for (let t = WORK_DAY_START_MINUTES; t <= LATEST_APPOINTMENT_START_MINUTES; t += SLOT_INCREMENT_MINUTES) {
+                const newAppWorkBlock = { start: t, end: t + requiredDuration };
+
+                const hypotheticalWorkSchedule = techAppointments.map(app => ({
+                    start: timeToMinutes(app.startTime),
+                    end: timeToMinutes(app.startTime) + app.duration
+                }));
+                hypotheticalWorkSchedule.push(newAppWorkBlock);
+                
+                // Controlla se questa nuova agenda ipotetica permette di inserire una pausa pranzo valida,
+                // tenendo conto di tutte le regole sugli spostamenti.
+                if (canScheduleLunch(hypotheticalWorkSchedule)) {
+                    availableSlots.push(minutesToTime(t));
+                }
+            }
+
+            return availableSlots;
+        }
+
+        async function findBestAppointmentSlot(manualDate = null, province = null, duration) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            let bestOptions = [];
+            const proximityRadius = HIGH_DENSITY_PROVINCES[province] || PROXIMITY_RADIUS_KM_DEFAULT;
+
+            const searchLogic = async (searchDate) => {
+                const dateString = searchDate.toISOString().split('T')[0];
+                const appointmentsOnDate = existingAppointments.filter(app => app.date === dateString);
+
+                // Priorità 1: Prossimità
+                if (appointmentsOnDate.length > 0) {
+                    let proximityOptions = [];
+                    for (const app of appointmentsOnDate) {
+                        const { distance } = await getDrivingDistance(newCustomerLocation, new google.maps.LatLng(app.lat, app.lng));
+                        if (distance <= proximityRadius) {
+                            proximityOptions.push({ distance, techId: app.technicianId });
+                        }
+                    }
+                    if (proximityOptions.length > 0) {
+                        proximityOptions.sort((a, b) => a.distance - b.distance);
+                        const bestMatch = proximityOptions[0];
+                        const tech = technicians.find(t => t.id === bestMatch.techId);
+                        const techAppointments = appointmentsOnDate.filter(a => a.technicianId === tech.id);
+                        const availableSlots = calculateAvailableSlots(techAppointments, duration);
+                        if (availableSlots.length > 0) {
+                             return { isOptimal: true, date: dateString, tech, availableSlots, reason: `perché in zona (a ${bestMatch.distance.toFixed(1)} km)`, priority: 1, dateObj: searchDate };
+                        }
+                    }
+                }
+                
+                // Priorità 2: Tecnico Libero o meno occupato
+                const techLoad = technicians.map(tech => ({ tech, appointments: appointmentsOnDate.filter(a => a.technicianId === tech.id) }));
+                techLoad.sort((a,b) => a.appointments.length - b.appointments.length);
+                
+                for(const item of techLoad){
+                    const availableSlots = calculateAvailableSlots(item.appointments, duration);
+                    if (availableSlots.length > 0) {
+                        const reason = item.appointments.length === 0 ? 'perché completamente libero' : 'perché è il meno occupato';
+                        return { isOptimal: false, date: dateString, tech: item.tech, availableSlots, reason: reason, priority: 2, dateObj: searchDate };
+                    }
+                }
+                
+                return null;
+            };
+
+            if (manualDate) {
+                const searchDate = new Date(manualDate + 'T12:00:00');
+                if (searchDate.getDay() === 0 || searchDate.getDay() === 6) {
+                    resultsDiv.innerHTML = `<div class="p-4 bg-yellow-100 text-yellow-800 rounded-lg">Non si lavora di Sabato o Domenica.</div>`;
+                    return;
+                }
+                const singleOption = await searchLogic(searchDate);
+                if(singleOption) bestOptions.push(singleOption);
+            } else {
+                let allPossibleOptions = [];
+                for (let i = 1; i < 16; i++) {
+                    const searchDate = new Date();
+                    searchDate.setDate(new Date().getDate() + i);
+                    if (searchDate.getDay() === 0 || searchDate.getDay() === 6) continue;
+                    const optionForDay = await searchLogic(searchDate);
+                    if (optionForDay) {
+                        allPossibleOptions.push(optionForDay);
+                    }
+                }
+                allPossibleOptions.sort((a, b) => {
+                    if (a.priority !== b.priority) return a.priority - b.priority;
+                    return a.dateObj - b.dateObj;
+                });
+                
+                bestOptions = allPossibleOptions.slice(0, 3);
+            }
+            
+            let html = '';
+            if (bestOptions.length > 0) {
+                 bestOptions.forEach(bestOption => {
+                    const formattedDate = new Date(bestOption.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+                    html += `<div class="p-4 border rounded-lg bg-white mb-4 shadow-sm"><div class="text-center p-3 rounded-t-lg ${bestOption.isOptimal ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}"><h3 class="font-bold text-lg">${formattedDate}</h3><p class="text-sm">Suggerimento: <strong class="font-semibold">${bestOption.tech.name}</strong> (${bestOption.reason})</p></div><div class="p-3"><p class="text-center text-sm font-semibold mb-3 text-gray-600">Orari disponibili:</p><div class="grid grid-cols-3 sm:grid-cols-4 gap-2">`;
+                    bestOption.availableSlots.forEach(slot => { html += `<button onclick="openModal('${bestOption.date}', '${slot}', ${bestOption.tech.id})" class="w-full text-center py-2 rounded-md ${bestOption.isOptimal ? 'bg-green-500' : 'bg-blue-500'} text-white font-semibold hover:opacity-80 transition text-sm">${slot}</button>`; });
+                    html += `</div></div></div>`;
+                });
+                resultsDiv.innerHTML = html;
+            } else {
+                resultsDiv.innerHTML = `<div class="p-4 bg-yellow-100 text-yellow-800 rounded-lg">Nessuna disponibilità trovata per un intervento da ${formatDuration(duration)} ${manualDate ? 'nella data selezionata' : 'nei prossimi 14 giorni'}.</div>`;
+            }
+        }
+        
+        function openModal(date, startTime, technicianId) { const modal = document.getElementById('client-modal'); const modalDetails = document.getElementById('modal-details'); const confirmButton = document.getElementById('modal-confirm-button'); const clientNameInput = document.getElementById('client-name'); const errorP = document.getElementById('modal-error'); const descInput = document.getElementById('client-description'); clientNameInput.value = ''; descInput.value = ''; errorP.classList.add('hidden'); const formattedDate = new Date(date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }); const duration = document.getElementById('duration').value; modalDetails.innerHTML = `Stai prenotando per <strong>${formattedDate}</strong> alle ore <strong>${startTime}</strong>.`; confirmButton.onclick = () => { const clientName = clientNameInput.value.trim(); if (clientName) { assignAppointment(date, startTime, technicianId, clientName); closeModal(); } else { errorP.classList.remove('hidden'); } }; modal.classList.remove('hidden'); clientNameInput.focus(); }
+        function closeModal() { document.getElementById('client-modal').classList.add('hidden'); }
+        
+        function assignAppointment(date, startTime, technicianId, clientName) { 
+            const address = document.getElementById('address').value; 
+            const duration = parseInt(document.getElementById('duration').value);
+            const description = document.getElementById('client-description').value;
+            const newAppointment = { id: nextAppointmentId++, date: date, client: clientName, address: address, lat: newCustomerLocation.lat(), lng: newCustomerLocation.lng(), startTime: startTime, duration: duration, description: description, technicianId: technicianId }; 
+            existingAppointments.push(newAppointment); 
+            document.getElementById('info-message').innerHTML = `<p class="text-green-700 font-bold">✅ Appuntamento fissato per ${clientName}!</p>`; 
+            document.getElementById('results').innerHTML = '<p class="text-gray-500">Appuntamento confermato.</p>'; 
+            updateAll();
+        }
+        
+        // --- FUNZIONALITA' EDIT ---
+        function isScheduleConflict(appointmentToEdit, newStartTimeStr, newDuration) {
+            const { technicianId, date } = appointmentToEdit;
+
+            // Prendi tutti gli ALTRI appuntamenti per questo tecnico in questo giorno
+            const otherAppointments = existingAppointments.filter(app =>
+                app.id !== appointmentToEdit.id &&
+                app.technicianId === technicianId &&
+                app.date === date
+            );
+
+            // Crea un'agenda di lavoro ipotetica con l'appuntamento modificato
+            const hypotheticalWorkSchedule = otherAppointments.map(app => ({
+                start: timeToMinutes(app.startTime),
+                end: timeToMinutes(app.startTime) + app.duration
+            }));
+            hypotheticalWorkSchedule.push({ 
+                start: timeToMinutes(newStartTimeStr), 
+                end: timeToMinutes(newStartTimeStr) + newDuration 
+            });
+
+            // C'è un conflitto se NON è possibile schedulare una pausa pranzo valida con questa nuova configurazione.
+            return !canScheduleLunch(hypotheticalWorkSchedule);
+        }
+        
+        function updateAvailableTimesInModal() {
+            const appointmentId = parseInt(document.getElementById('edit-appointment-id').value);
+            const app = existingAppointments.find(a => a.id === appointmentId);
+            if (!app) return;
+
+            const newDuration = parseInt(document.getElementById('edit-duration').value);
+            const timeSelect = document.getElementById('edit-start-time');
+            
+            const otherAppointments = existingAppointments.filter(a => a.id !== app.id && a.technicianId === app.technicianId && a.date === app.date);
+            
+            const availableSlots = calculateAvailableSlots(otherAppointments, newDuration);
+            
+            // Add the original slot to the list if it's not already there, to ensure it's always an option if no other changes are made.
+            if (!availableSlots.includes(app.startTime)) {
+                availableSlots.push(app.startTime);
+                availableSlots.sort();
+            }
+
+            timeSelect.innerHTML = '';
+            if (availableSlots.length > 0) {
+                availableSlots.forEach(slot => {
+                    const option = document.createElement('option');
+                    option.value = slot;
+                    option.textContent = slot;
+                    timeSelect.appendChild(option);
+                });
+            } else {
+                 const option = document.createElement('option');
+                 option.textContent = "Nessun orario";
+                 timeSelect.appendChild(option);
+            }
+        }
+
+
+        function openEditModal(appointmentId) {
+            const app = existingAppointments.find(a => a.id === appointmentId);
+            if (!app) return;
+            document.getElementById('edit-appointment-id').value = app.id;
+            document.getElementById('edit-client-name').value = app.client;
+            document.getElementById('edit-client-description').value = app.description || '';
+            document.getElementById('edit-duration').value = app.duration;
+            
+            updateAvailableTimesInModal(); // Populate time slots based on original duration
+            document.getElementById('edit-start-time').value = app.startTime;
+
+            document.getElementById('edit-modal-details').textContent = `Data: ${new Date(app.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}`;
+            document.getElementById('edit-modal-error').classList.add('hidden');
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+        function saveAppointmentChanges() {
+            const appointmentId = parseInt(document.getElementById('edit-appointment-id').value);
+            const errorP = document.getElementById('edit-modal-error');
+            const appIndex = existingAppointments.findIndex(a => a.id === appointmentId);
+            
+            if (appIndex === -1) return;
+
+            const app = existingAppointments[appIndex];
+            const newClientName = document.getElementById('edit-client-name').value;
+            const newDescription = document.getElementById('edit-client-description').value;
+            const newDuration = parseInt(document.getElementById('edit-duration').value);
+            const newStartTime = document.getElementById('edit-start-time').value;
+
+            errorP.classList.add('hidden');
+            
+            if (!newStartTime) {
+                errorP.textContent = "Nessun orario valido disponibile per la durata selezionata.";
+                errorP.classList.remove('hidden');
+                return;
+            }
+
+            if (isScheduleConflict(app, newStartTime, newDuration)) {
+                errorP.textContent = "Errore: Il nuovo orario o durata crea un conflitto con un altro appuntamento o con la pausa pranzo.";
+                errorP.classList.remove('hidden');
+                return;
+            }
+            
+            existingAppointments[appIndex].client = newClientName;
+            existingAppointments[appIndex].description = newDescription;
+            existingAppointments[appIndex].duration = newDuration;
+            existingAppointments[appIndex].startTime = newStartTime;
+            
+            updateAll();
+            closeEditModal();
+        }
+
+
+        function openDeleteModal(appointmentId) {
+            const modal = document.getElementById('delete-modal');
+            const modalDetails = document.getElementById('delete-modal-details');
+            const confirmButton = document.getElementById('delete-modal-confirm-button');
+            const appToDelete = existingAppointments.find(app => app.id === appointmentId);
+            if (!appToDelete) return;
+            modalDetails.innerHTML = `Sei sicuro di voler cancellare l'appuntamento di <strong>${appToDelete.client}</strong> delle ore <strong>${appToDelete.startTime}</strong>?`;
+            confirmButton.onclick = () => { deleteAppointment(appointmentId); closeDeleteModal(); };
+            modal.classList.remove('hidden');
+        }
+
+        function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); }
+
+        function deleteAppointment(appointmentId) {
+            existingAppointments = existingAppointments.filter(app => app.id !== appointmentId);
+            updateAll();
+        }
+
+        function openReassignModal(appointmentId) {
+            const modal = document.getElementById('reassign-modal');
+            const details = document.getElementById('reassign-modal-details');
+            const select = document.getElementById('reassign-tech');
+            const confirmButton = document.getElementById('reassign-modal-confirm-button');
+            const app = existingAppointments.find(a => a.id === appointmentId);
+            if (!app) return;
+            details.innerHTML = `Sposta l'appuntamento di <strong>${app.client}</strong> a un altro tecnico.`;
+            select.innerHTML = '';
+            technicians.filter(t => t.id !== app.technicianId).forEach(t => { const option = document.createElement('option'); option.value = t.id; option.textContent = t.name; select.appendChild(option); });
+            confirmButton.onclick = () => { reassignAppointment(appointmentId, parseInt(select.value)); closeReassignModal(); };
+            modal.classList.remove('hidden');
+        }
+
+        function closeReassignModal() { document.getElementById('reassign-modal').classList.add('hidden'); }
+
+        function reassignAppointment(appointmentId, newTechId) {
+            const appIndex = existingAppointments.findIndex(a => a.id === appointmentId);
+            if (appIndex > -1) { existingAppointments[appIndex].technicianId = newTechId; updateAll(); }
+        }
+
+        function displayDailySummary() { 
+            const container = document.getElementById('summary-container');
+            const selectedDate = document.getElementById('summary-date').value;
+            const searchTerm = document.getElementById('client-search').value.toLowerCase();
+            
+            let appointmentsToShow = existingAppointments;
+            
+            if (searchTerm) {
+                 appointmentsToShow = appointmentsToShow.filter(app => app.client.toLowerCase().includes(searchTerm));
+            } else if (selectedDate) {
+                 appointmentsToShow = appointmentsToShow.filter(app => app.date === selectedDate);
+            }
+
+            if (appointmentsToShow.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8 bg-white rounded-xl shadow-md">Nessun appuntamento trovato per i criteri selezionati.</p>';
+                return;
+            }
+
+            const groupedByTechnician = technicians.map(tech => ({
+                ...tech,
+                appointments: appointmentsToShow
+                    .filter(app => app.technicianId === tech.id)
+                    .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+            })).filter(techGroup => techGroup.appointments.length > 0);
+
+            let html = '';
+            if (searchTerm) {
+                html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Risultati ricerca per "${searchTerm}"</h2>`;
+            } else if (selectedDate) {
+                const formattedDate = new Date(selectedDate + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Riepilogo per ${formattedDate}</h2>`;
+            } else {
+                html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Tutti gli Interventi Futuri</h2>`;
+            }
+
+            html += '<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">';
+
+            groupedByTechnician.forEach(techGroup => {
+                html += `
+                    <div class="bg-white rounded-xl shadow-md">
+                        <div class="flex items-center p-4 border-b">
+                            <span class="h-4 w-4 rounded-full mr-3" style="background-color: ${techGroup.color};"></span>
+                            <h3 class="text-xl font-bold text-gray-700">${techGroup.name}</h3>
+                        </div>
+                        <div class="space-y-3 p-4">`;
+                
+                techGroup.appointments.forEach(app => {
+                    const formattedDate = new Date(app.date + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+                    html += `
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-bold text-md text-blue-800">${app.client}</p>
+                                    <p class="text-xs text-gray-500">${app.address}</p>
+                                     ${app.description ? `<p class="text-xs text-gray-800 mt-1 italic">"${app.description}"</p>` : ''}
+                                </div>
+                                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap">${app.startTime} (${formatDuration(app.duration)})</span>
+                            </div>
+                            <div class="mt-3 flex items-center justify-between">
+                                 <span class="text-sm font-medium text-gray-600">${formattedDate}</span>
+                                 <div class="flex items-center gap-2">
+                                     <button onclick="openEditModal(${app.id})" class="text-xs bg-gray-500 hover:bg-gray-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Modifica</button>
+                                     <button onclick="openReassignModal(${app.id})" class="text-xs bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-1 px-2 rounded-md transition-colors">Riassegna</button>
+                                     <button onclick="openDeleteModal(${app.id})" class="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold py-1 px-2 rounded-md transition-colors">Cancella</button>
+                                 </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+        
+        function displayArchive() {
+            const container = document.getElementById('archive-container');
+            const searchTerm = document.getElementById('archive-search').value.toLowerCase();
+            const selectedDate = document.getElementById('archive-date').value;
+
+            let appointmentsToShow = archivedAppointments;
+
+            if (searchTerm) {
+                appointmentsToShow = appointmentsToShow.filter(app => 
+                    app.client.toLowerCase().includes(searchTerm) || 
+                    app.address.toLowerCase().includes(searchTerm)
+                );
+            }
+            if (selectedDate) {
+                 appointmentsToShow = appointmentsToShow.filter(app => app.date === selectedDate);
+            }
+
+            appointmentsToShow.sort((a, b) => b.date.localeCompare(a.date) || a.startTime.localeCompare(b.startTime));
+
+            if (appointmentsToShow.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">Nessun intervento trovato nell\'archivio per i criteri selezionati.</p>';
+                return;
+            }
+
+            let html = '';
+            appointmentsToShow.forEach(app => {
+                const tech = technicians.find(t => t.id === app.technicianId);
+                const formattedDate = new Date(app.date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                html += `
+                    <div class="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex-grow">
+                            <p class="font-bold text-gray-800">${app.client}</p>
+                            <p class="text-sm text-gray-600">${app.address}</p>
+                             ${app.description ? `<p class="text-xs text-gray-700 mt-1 italic">"${app.description}"</p>` : ''}
+                        </div>
+                        <div class="flex-shrink-0 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 text-sm">
+                            <span class="font-semibold text-gray-700">${formattedDate}</span>
+                            <span class="bg-gray-200 text-gray-800 font-semibold px-2 py-1 rounded">${app.startTime} (${formatDuration(app.duration)})</span>
+                            <span class="flex items-center gap-2">
+                                <span class="h-3 w-3 rounded-full" style="background-color: ${tech ? tech.color : 'gray'}"></span>
+                                <span class="font-medium">${tech ? tech.name : 'N/D'}</span>
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+
+        let mapMarkers = [];
+        function updateMap() {
+            if (!map) return;
+            mapMarkers.forEach(marker => marker.setMap(null));
+            mapMarkers = [];
+
+            const selectedDate = document.getElementById('map-date-filter').value;
+            const today = new Date().toISOString().split('T')[0];
+            const dateToDisplay = selectedDate || today; 
+
+            document.getElementById('map-date-filter').value = dateToDisplay;
+
+            const appointmentsForDay = existingAppointments.filter(app => app.date === dateToDisplay);
+            
+            const mapDiv = document.getElementById('map');
+            if (mapDiv.innerHTML.includes("Nessun appuntamento")) {
+                 mapDiv.innerHTML = '';
+                 map = new google.maps.Map(document.getElementById("map"), { center: { lat: 40.8518, lng: 14.2681 }, zoom: 8, mapTypeControl: false, streetViewControl: false });
+            }
+
+            if (appointmentsForDay.length === 0) {
+                if(typeof map.setCenter === 'function') {
+                    map.setCenter({ lat: 40.8518, lng: 14.2681 });
+                    map.setZoom(8);
+                }
+                 mapDiv.innerHTML = `<div class="flex items-center justify-center h-full"><p class="text-gray-500 font-semibold">Nessun appuntamento per ${new Date(dateToDisplay+'T12:00:00').toLocaleDateString('it-IT', {day: 'numeric', month: 'long'})}.</p></div>`;
+                return;
+            }
+
+            const bounds = new google.maps.LatLngBounds();
+
+            appointmentsForDay.forEach(app => {
+                const tech = technicians.find(t => t.id === app.technicianId);
+                const position = { lat: app.lat, lng: app.lng };
+                const markerIcon = {
+                    path: 'M12 2C8.1 2 5 5.1 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.9-3.1-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+                    fillColor: tech ? tech.color : 'gray',
+                    fillOpacity: 1,
+                    strokeWeight: 0,
+                    scale: 1.5,
+                    anchor: new google.maps.Point(12, 24),
+                };
+                const marker = new google.maps.Marker({ position, map, title: app.client, icon: markerIcon });
+                const infoWindow = new google.maps.InfoWindow({ content: `<div class="p-1"><p class="font-bold">${app.client}</p><p>${app.address}</p><p><strong>Orario:</strong> ${app.startTime} (${formatDuration(app.duration)})</p><p><strong>Tecnico:</strong> ${tech ? tech.name : 'N/A'}</p></div>` });
+                marker.addListener('click', () => { infoWindow.open(map, marker); });
+                mapMarkers.push(marker);
+                bounds.extend(position);
+            });
+
+            if (appointmentsForDay.length > 0) {
+                map.fitBounds(bounds);
+                if (appointmentsForDay.length === 1) { map.setZoom(12); }
+            }
+        }
+        
+        function updateDashboardCards() {
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowString = tomorrow.toISOString().split('T')[0];
+            
+            const todayAppointments = existingAppointments.filter(a => a.date === today);
+            const tomorrowAppointments = existingAppointments.filter(a => a.date === tomorrowString);
+            
+            document.getElementById('dash-today').textContent = todayAppointments.length;
+            document.getElementById('dash-tomorrow').textContent = tomorrowAppointments.length;
+            document.getElementById('dash-total').textContent = existingAppointments.length;
+            
+            const busyTechsToday = new Set(todayAppointments.map(a => a.technicianId)).size;
+            document.getElementById('dash-techs').textContent = `${busyTechsToday} / ${technicians.length}`;
+        }
+
         function updateAll() {
             updateDashboardCards();
-            if(document.getElementById('content-summary').classList.contains('hidden') === false) displayDailySummary();
-            if(document.getElementById('content-archive').classList.contains('hidden') === false) displayArchive();
+            if (document.getElementById('content-summary').classList.contains('hidden') === false) {
+                 displayDailySummary();
+            }
+            if (document.getElementById('content-archive').classList.contains('hidden') === false) {
+                 displayArchive();
+            }
             updateMap();
         }
 
         function switchTab(tab, event) {
             if (event) event.preventDefault();
             
-            document.querySelectorAll('.content-view').forEach(view => view.classList.add('hidden'));
-            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            const tabs = ['dashboard', 'planner', 'summary', 'archive'];
+            const tabTitles = { dashboard: 'Home', planner: 'Pianificazione', summary: 'Riepilogo', archive: 'Archivio' };
 
-            document.querySelectorAll('.tab-link').forEach(link => {
-                link.classList.remove('sidebar-link-active');
+            tabs.forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).classList.remove('active');
             });
-            document.getElementById(`tab-${tab}`).classList.add('sidebar-link-active');
 
-            const tabTitles = { 'dashboard': 'Home', 'planner': 'Pianificazione', 'summary': 'Riepilogo', 'archive': 'Archivio'};
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('active');
             document.getElementById('mobile-page-title').textContent = tabTitles[tab];
-            
+
+            // Close sidebar on mobile
             const sidebar = document.getElementById('sidebar');
             if (window.innerWidth < 768 && !sidebar.classList.contains('-translate-x-full')) {
                 document.getElementById('mobile-menu-button').click();
             }
-
-            if (tab === 'summary') {
-                document.getElementById('summary-date').value = new Date().toISOString().split('T')[0];
-                displayDailySummary();
-            }
-            if (tab === 'archive') displayArchive();
-            if (tab === 'dashboard') updateAll();
-        }
-
-        async function handleAddressCheck() {
-            const address = document.getElementById('client-search').value;
-            const dateInput = document.getElementById('summary-date-planner').value;
-            const loader = document.getElementById('loader');
-            const resultsDiv = document.getElementById('availability-results');
-            resultsDiv.innerHTML = '';
             
-            if (!address) {
-                alert("Per favore, inserisci un indirizzo.");
-                return;
-            }
-
-            loader.classList.remove('hidden');
-
-            const searchStartDate = dateInput ? new Date(dateInput) : new Date();
-             if (!dateInput) {
-                searchStartDate.setDate(searchStartDate.getDate() + 1); // Start from tomorrow if no date is set
-            }
-            searchStartDate.setHours(0, 0, 0, 0);
-
-            const timeSlots = ['09:00', '11:00', '14:00', '16:00'];
-            let availableSlots = [];
-            
-            for (let i = 0; i < 7; i++) { // Increased search to 7 days
-                const currentDate = new Date(searchStartDate);
-                currentDate.setDate(currentDate.getDate() + i);
-                const dateStr = currentDate.toISOString().split('T')[0];
-
-                const dailyAppointments = Array.from(appointments.values()).filter(a => a.date === dateStr);
-                
-                for (const tech of technicians) {
-                    const techAppointments = dailyAppointments.filter(a => a.technician === tech);
-                    
-                    for (const slot of timeSlots) {
-                        const isSlotTaken = techAppointments.some(a => a.time === slot);
-                        if (!isSlotTaken) {
-                            const nearbyAppointments = dailyAppointments.filter(a => a.technician === tech);
-                            const isNear = nearbyAppointments.length > 0;
-                            availableSlots.push({ date: dateStr, time: slot, technician: tech, near: isNear });
-                        }
-                    }
-                }
-            }
-
-            loader.classList.add('hidden');
-            
-            if (availableSlots.length > 0) {
-                 availableSlots.sort((a, b) => {
-                    if (a.date < b.date) return -1;
-                    if (a.date > b.date) return 1;
-                    if (a.time < b.time) return -1;
-                    if (a.time > b.time) return 1;
-                    if (a.near && !b.near) return -1;
-                    if (!a.near && b.near) return 1;
-                    return 0;
-                });
-                
-                resultsDiv.innerHTML = '<h3 class="text-xl font-semibold mb-4">Slot Disponibili:</h3>';
-                availableSlots.forEach(slot => {
-                    const bgColor = slot.near ? 'bg-green-100 hover:bg-green-200' : 'bg-blue-100 hover:bg-blue-200';
-                    const textColor = slot.near ? 'text-green-800' : 'text-blue-800';
-                    const borderColor = slot.near ? 'border-green-300' : 'border-blue-300';
-                    const buttonHtml = `
-                        <div class="p-4 rounded-lg border ${borderColor} ${bgColor} ${textColor} transition-all duration-200 cursor-pointer mb-2" 
-                             onclick="window.createAppointment('${slot.date}', '${slot.time}', '${slot.technician}', '${address.replace(/'/g, "\\'")}')">
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <p class="font-bold text-lg">${new Date(slot.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })} - ${slot.time}</p>
-                                    <p>Tecnico: <span class="font-semibold">${slot.technician}</span></p>
-                                </div>
-                                ${slot.near ? '<span class="text-sm font-medium bg-green-500 text-white py-1 px-3 rounded-full">In Zona</span>' : ''}
-                            </div>
-                        </div>`;
-                    resultsDiv.innerHTML += buttonHtml;
-                });
-            } else {
-                resultsDiv.innerHTML = '<p class="text-center text-red-500">Nessuna disponibilità trovata nei prossimi 7 giorni.</p>';
-            }
-        }
-        
-        async function createAppointment(date, time, technician, address) {
-            if (!userId) return;
-            const newApt = { date, time, technician, address, status: 'scheduled' };
-            try {
-                await addDoc(collection(db, `users/${userId}/appointments`), newApt);
-                alert(`Appuntamento creato per il ${date} alle ${time} con ${technician}.`);
-                document.getElementById('availability-results').innerHTML = '';
-                document.getElementById('client-search').value = '';
-                document.getElementById('summary-date-planner').value = '';
-                document.getElementById('summary-date').value = date;
-                switchTab('summary');
-            } catch (e) {
-                console.error("Error adding document: ", e);
-                alert("Errore nella creazione dell'appuntamento.");
+            if (tab === 'summary' || tab === 'archive' || tab === 'dashboard') {
+                updateAll();
             }
         }
 
-        function displayDailySummary() {
-            const summaryView = document.getElementById('summary-view');
-            summaryView.innerHTML = '';
-            const selectedDate = document.getElementById('summary-date').value || new Date().toISOString().split('T')[0];
-            
-            const dailyAppointments = Array.from(appointments.values())
-                .filter(apt => apt.date === selectedDate && apt.status === 'scheduled')
-                .sort((a,b) => a.time.localeCompare(b.time));
-
-            if (dailyAppointments.length === 0) {
-                summaryView.innerHTML = `<p class="text-center text-gray-500">Nessun appuntamento per il ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.</p>`;
-                updateMap([]);
-                return;
-            }
-            
-            technicians.forEach(tech => {
-                const techAppointments = dailyAppointments.filter(apt => apt.technician === tech);
-                if (techAppointments.length > 0) {
-                    let techHtml = `<div class="mb-6"><h3 class="text-xl font-bold text-gray-700 mb-2">${tech}</h3><div class="space-y-3">`;
-                    techAppointments.forEach(apt => {
-                       techHtml += `
-                        <div class="bg-white p-4 rounded-lg shadow-md border-l-4 border-indigo-500">
-                            <p class="font-semibold">${apt.time} - ${apt.address}</p>
-                            <div class="text-right mt-2 space-x-4">
-                                <button class="text-sm text-green-600 hover:text-green-800 font-semibold" onclick="window.updateAppointmentStatus('${apt.id}', 'completed')"><i class="fas fa-check mr-1"></i>Completato</button>
-                                <button class="text-sm text-red-600 hover:text-red-800 font-semibold" onclick="window.updateAppointmentStatus('${apt.id}', 'canceled')"><i class="fas fa-times mr-1"></i>Annullato</button>
-                            </div>
-                        </div>`;
-                    });
-                    techHtml += '</div></div>';
-                    summaryView.innerHTML += techHtml;
-                }
-            });
-            updateMap(dailyAppointments);
-        }
-        
-        document.getElementById('summary-date').addEventListener('change', displayDailySummary);
-
-        function displayArchive() {
-            const archiveView = document.getElementById('archive-view');
-            archiveView.innerHTML = '';
-            const archivedAppointments = Array.from(appointments.values())
-                .filter(apt => apt.status === 'completed' || apt.status === 'canceled')
-                 .sort((a,b) => new Date(b.date) - new Date(a.date));
-
-            if (archivedAppointments.length === 0) {
-                archiveView.innerHTML = '<p class="text-center text-gray-500">Nessun appuntamento archiviato.</p>';
-                return;
-            }
-            
-            archivedAppointments.forEach(apt => {
-                const statusColor = apt.status === 'completed' ? 'text-green-600' : 'text-red-600';
-                const statusIcon = apt.status === 'completed' ? 'fa-check-circle' : 'fa-times-circle';
-                const statusText = apt.status === 'completed' ? 'Completato' : 'Annullato';
-                archiveView.innerHTML += `
-                    <div class="bg-white p-4 rounded-lg shadow-sm border">
-                        <p class="text-gray-600">${new Date(apt.date + 'T00:00:00').toLocaleDateString('it-IT', {weekday: 'long', day: 'numeric', month: 'long'})} - ${apt.time}</p>
-                        <p class="font-semibold">${apt.address} (${apt.technician})</p>
-                        <p class="font-semibold ${statusColor} mt-1"><i class="fas ${statusIcon} mr-1"></i>${statusText}</p>
-                    </div>`;
-            });
-        }
-        
-        async function updateAppointmentStatus(id, status) {
-            if (!userId) return;
-            const aptRef = doc(db, `users/${userId}/appointments`, id);
-            try {
-                await setDoc(aptRef, { status: status }, { merge: true });
-                console.log(`Appointment ${id} status updated to ${status}`);
-            } catch (e) {
-                console.error("Error updating status: ", e);
-            }
+        // --- Funzioni di Navigazione Dashboard ---
+        function viewToday() {
+            const todayString = new Date().toISOString().split('T')[0];
+            document.getElementById('summary-date').value = todayString;
+            document.getElementById('client-search').value = '';
+            switchTab('summary');
         }
 
-        function updateDashboardCards() {
-            const today = new Date();
-            const tomorrow = new Date(today);
+        function viewTomorrow() {
+            const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
-            
-            const todayString = today.toISOString().split('T')[0];
             const tomorrowString = tomorrow.toISOString().split('T')[0];
-
-            let todayCount = 0;
-            let tomorrowCount = 0;
-            let futureCount = 0;
-            const busyTechsToday = new Set();
-            
-            for (const apt of appointments.values()) {
-                 if (apt.status === 'scheduled') {
-                    if (apt.date === todayString) {
-                        todayCount++;
-                        busyTechsToday.add(apt.technician);
-                    } else if (apt.date === tomorrowString) {
-                        tomorrowCount++;
-                    } else if (apt.date > tomorrowString) {
-                        futureCount++;
-                    }
-                }
-            }
-            
-            document.getElementById('dash-today').textContent = todayCount;
-            document.getElementById('dash-tomorrow').textContent = tomorrowCount;
-            document.getElementById('dash-future').textContent = futureCount;
-            document.getElementById('dash-techs-today').textContent = `${busyTechsToday.size} / ${technicians.length}`;
+            document.getElementById('summary-date').value = tomorrowString;
+            document.getElementById('client-search').value = '';
+            switchTab('summary');
         }
-        
-        function updateMap(appts) {
-            // Placeholder for map functionality
-            const mapDiv = document.getElementById('map');
-            if (mapDiv) {
-                if (appts && appts.length > 0) {
-                     mapDiv.innerHTML = `<p class="p-4 text-center text-gray-600">Mappa degli appuntamenti per il giorno selezionato. (${appts.length} interventi)</p>`;
-                } else {
-                    mapDiv.innerHTML = '<p class="p-4 text-center text-gray-500">Nessun appuntamento da mostrare sulla mappa.</p>';
-                }
-            }
+
+        function viewTotal() {
+            document.getElementById('summary-date').value = '';
+            document.getElementById('client-search').value = ''; 
+            switchTab('summary');
         }
-        
-        // Setup UI event listeners
-        document.getElementById('search-availability').addEventListener('click', handleAddressCheck);
-        
-        const mobileMenuButton = document.getElementById('mobile-menu-button');
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.getElementById('mobile-menu-overlay');
-
-        mobileMenuButton.addEventListener('click', () => {
-            sidebar.classList.toggle('-translate-x-full');
-            overlay.classList.toggle('hidden');
-        });
-        overlay.addEventListener('click', () => {
-             sidebar.classList.add('-translate-x-full');
-            overlay.classList.add('hidden');
-        });
-
-        // Funzioni globali esposte
-        window.createAppointment = createAppointment;
-        window.updateAppointmentStatus = updateAppointmentStatus;
-        window.switchTab = switchTab;
-        
-        // Inizializzazione
-        signInAndInitialize();
 
     </script>
 </body>
-
 </html>
+
