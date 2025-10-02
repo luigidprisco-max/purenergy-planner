@@ -275,9 +275,9 @@
         // --- GLOBAL VARIABLES & CONFIG ---
         window.db = null;
         let appointmentsCollectionPath = '';
+        let API_KEY;
         
         // --- CONFIGURAZIONE ---
-        const API_KEY = "INSERISCI_LA_TUA_CHIAVE_API_DI_GOOGLE_MAPS_QUI"; // Replace with your Google Maps API Key
         const PROXIMITY_RADIUS_KM_DEFAULT = 50;
         const HIGH_DENSITY_PROVINCES = { "Napoli": 15, "Salerno": 15, "Caserta": 20 };
         const technicians = [ { id: 1, name: "DANIELE", color: "red" }, { id: 2, name: "ERNESTO", color: "green" }, { id: 3, name: "CARMINE", color: "purple" } ];
@@ -306,44 +306,23 @@
         // --- FIREBASE INITIALIZATION ---
         function initFirebase() {
             try {
-                // =======================================================================
-                // --- INCOLLA QUI LA TUA CONFIGURAZIONE FIREBASE ---
-                // Sostituisci questo blocco con l'oggetto firebaseConfig che hai copiato
-                // dalla console di Firebase.
-                // =======================================================================
-                const firebaseConfig = {
-                  apiKey: "INCOLLA-QUI",
-                  authDomain: "INCOLLA-QUI",
-                  projectId: "INCOLLA-QUI",
-                  storageBucket: "INCOLLA-QUI",
-                  messagingSenderId: "INCOLLA-QUI",
-                  appId: "INCOLLA-QUI"
-                };
-
-                // =======================================================================
-                // --- INCOLLA QUI IL TUO APP ID ---
-                // Usa lo stesso valore che hai inserito in `projectId` qui sopra.
-                // =======================================================================
-                const appId = "INCOLLA-QUI-IL-TUO-PROJECT-ID"; // <-- SOSTITUISCI CON IL TUO PROJECT ID
-
-
-                // Non modificare il codice sotto questa riga
-                // -----------------------------------------------------------------------
-                if (firebaseConfig.apiKey === "INCOLLA-QUI") {
-                    throw new Error("Configurazione Firebase non inserita nel codice.");
+                if (typeof __firebase_config === 'undefined' || typeof __app_id === 'undefined') {
+                    throw new Error("Configurazione Firebase non trovata.");
                 }
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const appId = __app_id;
 
                 const app = initializeApp(firebaseConfig);
                 window.db = getFirestore(app);
-                setLogLevel('debug');
+                setLogLevel('debug'); // For development
                 
                 appointmentsCollectionPath = `/artifacts/${appId}/public/data/appointments`;
                 listenToAppointments();
 
             } catch (error) {
                 console.error("Errore Inizializzazione Firebase:", error);
-                document.getElementById('firebase-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Errore di Configurazione Firebase</p><p>Assicurati di aver incollato correttamente l'oggetto 'firebaseConfig' e l''appId' nel file index.html.</p></div>`;
-                document.getElementById('initial-loader').classList.add('hidden');
+                document.getElementById('firebase-alert').innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-lg"><p class="font-bold">Errore di Configurazione Firebase</p><p>Assicurati che le variabili d'ambiente __firebase_config e __app_id siano impostate correttamente in Railway.</p></div>`;
+                document.getElementById('initial-loader').classList.add('hidden'); // Hide loader on error
             }
         }
 
@@ -416,22 +395,26 @@
             overlay.addEventListener('click', toggleSidebar);
 
             // --- Google Maps setup ---
-            const apiKeyInput = document.getElementById('api-key-input-field'); // Assuming you add an input field for the API key
-            const currentApiKey = API_KEY;
-
-            if (currentApiKey === "INSERISCI_LA_TUA_CHIAVE_API_DI_GOOGLE_MAPS_QUI" || !currentApiKey) {
-                document.getElementById('api-key-alert').innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-lg"><p class="font-bold">Manca la Chiave API di Google Maps</p><p>La mappa e la ricerca per indirizzo non funzioneranno finché non inserirai una chiave API valida nel codice (cerca la costante API_KEY).</p></div>`;
-                document.getElementById('search-button').disabled = true;
-                document.getElementById('search-button').classList.add('opacity-50', 'cursor-not-allowed');
-                document.getElementById('address').disabled = true;
-                document.getElementById('map').innerHTML = '<p class="text-gray-500 font-semibold">Mappa disattivata. Inserisci una chiave API.</p>';
-            } else {
+            try {
+                if (typeof __google_maps_api_key === 'undefined' || !__google_maps_api_key) {
+                    throw new Error("Chiave API Google Maps non trovata.");
+                }
+                API_KEY = __google_maps_api_key;
+                
                 const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${currentApiKey}&callback=initMap&libraries=geometry,places`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&callback=initMap&libraries=geometry,places`;
                 script.async = true;
                 script.defer = true;
                 window.initMap = initMap; // Make it globally accessible
                 document.head.appendChild(script);
+
+            } catch (error) {
+                console.error("Errore Inizializzazione Google Maps:", error);
+                document.getElementById('api-key-alert').innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded-lg"><p class="font-bold">Manca la Chiave API di Google Maps</p><p>Assicurati che la variabile d'ambiente __google_maps_api_key sia impostata correttamente in Railway.</p></div>`;
+                document.getElementById('search-button').disabled = true;
+                document.getElementById('search-button').classList.add('opacity-50', 'cursor-not-allowed');
+                document.getElementById('address').disabled = true;
+                document.getElementById('map').innerHTML = '<p class="text-gray-500 font-semibold">Mappa disattivata.</p>';
             }
             
             // --- Date input setup ---
